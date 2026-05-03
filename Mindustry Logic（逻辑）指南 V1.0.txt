@@ -1,0 +1,1333 @@
+Mindustry Logic（逻辑）指南 V1.0
+
+作者：西红柿汤
+
+参考来源：
+wiki - https://mindustrygame.github.io/wiki/logic/
+learn mindustry logic（A4 Tacks的逻辑教程） - https://github.com/A4-Tacks/learn-mindustry-logic
+
+推荐项目：
+A4 Tacks的逻辑编译器 - https://github.com/A4-Tacks/mindustry_logic_bang_lang
+A4 Tacks的逻辑编译器学习引导 - https://github.com/A4-Tacks/mindustry_logic_bang_lang/blob/main/examples/README.md
+
+附录：游戏内容.md
+
+若你发现任何问题，欢迎加入QQ群并@我，QQ群号：1034687528。当然，你也可以选择直接向我的QQ发送消息，QQ号：3758268235，邮箱也可以：3758268235@qq.com。我们欢迎您为这份指南做贡献！
+
+观前提示
+1.本指南适用的版本为release build 157.4，且仅为原版，不会以改端为参考
+2.遇到类似（输出：[类型]）的字眼，那是指该指令会输出的变量类型，由于所有代码都可能因为一些原因（例如你尝试用Sensor获取duo1的生命值，但逻辑块并未获取到duo1）而输出null，所以我们不讨论null
+
+前言
+本指南面相有一定代码基础的人快速入门逻辑语言（mlog），同时可将此文档作为AI数据库用于让AI辅助生成逻辑代码。
+
+正文
+一、什么是Logic（逻辑）？
+Logic，中文名逻辑，使用游戏作者（Anuke）自创的mlog语言，是v6版本新增的脚本语言，旨在实现更高级的自动化与策略控制。它深受汇编语言启发，一次仅执行一条指令或操作，与Python、Java、C++等高级语言不同，后者支持单行代码、函数、条件语句、循环和类，而mlog需通过基础指令组合实现复杂逻辑。在这门语言中，几乎所有值都是可变变量。
+
+它所能实现的功能包括但不限于：
+1.获取有关建筑和单位的信息
+2.控制建筑和单位的状态与行为
+3.写入/读取数据（如内存、画板）
+4.在显示屏上绘制图形（线条、矩形、图像等）
+5.通过信息板输出文本（支持颜色与换行）
+6.进行数学运算（一元运算如取绝对值、二元运算如加法）
+
+二、了解逻辑部件
+1.逻辑块（也可称处理器）：用于运行逻辑的建筑物，不同类型的逻辑块在处理速度（ipt）和权限上有差异，具体如下：
+- 微型处理器：ipt2
+- 逻辑处理器：ipt8
+- 超核处理器：ipt25
+- 世界处理器（别名“世处”）：ipt1~无限（默认8，可调整，在无数据包修改的情况下ipt最高可设为1000），权限最高；可控制全部建筑物（包括其他队伍的建筑），支持普通处理器无法使用的特权指令；无链接范围，可直接链接任何建筑
+
+2.内存：用于存储number类型变量的建筑，核心参数为“存储单元数”（每个单元可存1个number值，地址从0开始），具体如下：
+- 内存元：存储单元数64
+- 内存库：存储单元数512
+- 世界内存元：存储单元数512，仅世界处理器可操作
+
+3.显示屏：用于渲染绘图缓冲区内容的建筑，不同类型在分辨率上有差异，具体如下：
+- 逻辑显示屏：分辨率80*80，独立显示屏
+- 大型逻辑显示屏：分辨率176*176，独立显示屏
+- 逻辑显示单元：分辨率32*32，可拼接显示屏，支持与相邻（仅上下左右，不含斜向）的逻辑显示单元拼接成更大屏幕；单个单元代表整个大屏幕，缺失部分单元不影响整体创建，最大拼接尺寸16*16（屏幕范围由左下角和右上角的单元决定）
+
+4.开关：可控制开关的按钮，可通过点击或逻辑指令来控制开关，具体如下：
+- 开关
+- 世界开关：玩家可点击，但普通逻辑块无法操作
+
+5.信息板：用于记录文本信息的建筑，字数上限300（支持换行、空格），具体如下：
+- 信息板
+- 世界信息板：仅能使用世界处理器编辑
+- 强化信息板：功能与信息板一致
+
+6.画板：与显示屏类似，但无法通过DrawFlush渲染，仅能通过Read/Write读取/写入像素格颜色；分辨率12*12，支持8种颜色（从左到右对应颜色编号0~7，number类型）；像素格索引规则：左上角为0，向右依次递增，行满后换行从下一行最左侧继续。
+
+大型画板：与画板功能一致，但分辨率更大（24*24），支持16种颜色。
+
+三、了解逻辑块使用
+1.建筑链接操作：
+- 点击逻辑块，会显示黄色圆圈（世界处理器除外），代表该处理器的可链接范围；在范围内点击目标建筑，即可完成链接，被链接建筑会显示蓝紫色菱形，上方文本为该建筑在处理器内的调用名称；再次点击已链接建筑可取消链接。
+- 链接建筑命名规则：建筑名=建筑内部标识+同类型编号（编号从1开始）；同类型建筑按链接顺序递增编号（如首个“duo”建筑为duo1，第二个为duo2），不同类型建筑独立重新计数（如链接“arc”建筑时，首个为arc1，与“duo”编号无关）。
+- 会保存原编号，如果建筑意外丢失（例如被毁），编号不会更改（例如链接了两个duo，编号分别为1和2，那么1被毁后，另一个duo编号依然为2）
+
+2.权限限制：
+- 普通处理器（微型、逻辑、超核）：无法操作世界类型建筑（世界处理器、世界内存元、世界信息板、世界开关），也无法链接此类建筑。
+- 世界处理器：无权限限制，可操作所有建筑（含其他队伍建筑），可直接链接跨队伍建筑。
+
+3.建筑获取方式：
+- 除链接外，还可通过其他指令（UnitControl的子指令getblock；Rader）获取目标建筑或单位，无需依赖直接链接。
+
+四、逻辑的编写
+1.编辑界面操作：
+- 放置逻辑块后点击，再点击笔图标进入编辑界面（点击返回按钮退出）；旁侧“编辑”功能支持：从剪贴板导入代码、将代码导出到剪贴板、一键清除全部代码、重新运行逻辑（重新运行会将@counter值设为0，并清空所有变量的值）。
+- 旁侧“变量”功能可查看当前所有变量的值与@counter，称为变量表；“添加”按钮用于添加新的代码块。
+
+2.编写限制与注意事项：
+- 单个逻辑块最多支持1000条代码（编辑器中代码块编号0~999）。
+- 单人游戏：进入编辑界面会暂停游戏，进入变量表会继续游戏；多人游戏：编辑界面与变量表均不暂停游戏。
+- 逻辑重新运行触发条件：修改逻辑代码（如修改代码、删除代码）会触发处理器重新运行；其他处理器修改当前处理器的变量值，不会触发重新运行。
+- 更改生效规则：所有修改需点击“返回”按钮后才生效，未返回前的修改无效；建议定期导出代码到剪贴板，避免游戏崩溃导致代码丢失。
+- 代码块上的按钮作用：在代码块上方有三个按钮，从左到右分别为添加（在此代码块下方添加一个新的代码块），复制（复制一个相同的代码块在此代码块下方），删除（删除此代码块）
+- 神秘的代码失效问题：由于作者Anuke写的神秘代码，导致有时候代码完全正确但无法达到预期效果，这时可以将代码复制下来然后拆除逻辑块再放置一次
+
+3.编写方式及事项：
+- 方式一：游戏内编辑，通过点击“添加”按钮添加代码块，在编辑器中选择指令并设置参数。
+- 方式二：游戏外编写，用文本编辑器直接写代码，完成后粘贴到游戏编辑器中；文本编写支持用“#”添加注释（#后的整行内容会被忽略，注释不会显示在编辑器中，想要在编辑器内添加注释最好的选择就是用Print指令）。
+- 占位符说明：导出编辑器代码时，可能出现多余占位符（如“draw scale x y 0 0 0 0”），文本编写时可忽略这些占位符（仅需保留有效参数，占位符可填任意值）。
+- 子指令：主指令中有很多子指令，在此指南中，我将在需要提及某个具体指令时使用-来表示主指令的子指令，例如Draw指令中的print指令用Draw-print指令表示。
+
+4.特性及各指令的注意事项：
+在逻辑编写中，你需要注意一些特性和注意事项，在这里，你可以查看总的相关内容。我将在指南中写上类似(!1)、(!1,2)、(!1-1)这样的文本，其中的数字代表在此处相关的内容，我会使用,来添加多个内容引用，用-来表示引用段的引用点。
+
+-- 1.逻辑中的方向是0=右、90=上、180=左、270=下（依次递增；引用点1）或0=右、1=上、2=左、3=下（依次递增；引用点2），具体使用视情况而定，一般炮塔、单位用前者，传送带、载荷路由器用后者
+
+-- 2.Draw指令及绘图缓冲区注意事项：
+1.多处理器绘图冲突：多个逻辑块对同一显示屏绘图时，需协调指令执行顺序，避免clear、translate等修改全局缓冲区的指令冲突，否则会出现画面异常。例如闪屏
+2.DrawFlush渲染时机：建议在所有的Draw指令最后调用DrawFlush，若中途插入DrawFlush，会导致绘图操作分批渲染，出现闪屏（画面交替显示不同内容）。
+3.缓冲区上限：绘图缓冲区最多存储256个Draw操作，累计256个后必须调用DrawFlush清空，否则后续Draw指令无效。
+4.显示屏缓冲区上限：显示屏端最多排队1024个绘图操作，超过后新操作被丢弃（与处理器端256上限不同）。
+
+-- 3.文本的可用附加颜色名（括号中的中文仅仅只是提示是什么颜色，不属于附加颜色名的一部分）：
+白色系：white（白）、lightgray（浅灰）、gray（灰）、darkgray（深灰）、lightgrey（浅灰，lightgray同义词）、grey（灰，gray同义词）、darkgrey（深灰，darkgray同义词）
+蓝色系：blue（蓝）、navy（藏蓝）、royal（宝蓝）、slate（石板蓝）、sky（天蓝）、cyan（青）、teal（茶绿）
+绿色系：green（绿）、acid（酸绿）、lime（青柠绿）、forest（森林绿）、olive（橄榄绿）
+黄色系：yellow（黄）、gold（金）、goldenrod（金雀黄）、orange（橙）
+棕色系：brown（棕）、tan（棕褐）、brick（砖红）
+红色系：red（红）、scarlet（猩红）、crimson（深红）、coral（珊瑚红）、salmon（鲑红）、pink（粉）、magenta（品红）、purple（紫）、violet（紫罗兰）、maroon（褐红）
+特殊色（UI主题色，随游戏主题变化）：accent（强调色）、unlaunched（未发射色）、highlight（高亮色）、stat（状态色）、negstat（负状态色）
+黑色：black（黑）
+
+-- 4.文本缓冲区注意事项：
+1.文本缓冲区字符数上限为400，超过后无法继续写入。
+2.字符串不支持转义字符解析，如"\""会触发语法错误（需避免在字符串内使用单独双引号）。
+
+-- 5.GetLink注意事项：
+1.链接顺序动态调整：处理器会保存链接顺序并动态填充；例如：先链接双管炮（索引0）、再链接铜墙（索引1），若双管炮被毁，铜墙索引变为0；双管炮重建后，铜墙索引恢复为1。
+2.手动取消链接的影响：手动取消某建筑的链接后，该建筑的索引会被分配到当前链接列表的末尾；例如：取消双管炮（原索引0）链接，铜墙索引变为0；重新链接双管炮后，双管炮索引变为1。
+
+-- 6.时间条机制：
+1.时间条：逻辑控制建筑/单位时，会触发时间条，期间对象原AI停用，完全由逻辑控制；可用Control、Unit Control、Unit Rader、Unit Locate指令重置时间条，耗尽后对象恢复原AI。
+2.时间条长度：
+- 单位控制：时间条长度600tick，且部分Unit Control指令存在90tick的隐形计时器用于防止高频操作，单位必须等待90tick才能继续此操作，隐形计时器作用于Unit Control-payDorp、Unit Control-payTake、Unit Control-itmeDrop、Unit Control-itmeTake指令。
+- 建筑控制：建筑没有像单位那样的蓝色倒计时时间条，而是采用 `lastDisabler` 永久锁定机制：
+  - 每次执行 Control 指令立即生效（如 enabled、shoot 等）；
+  - 对 enabled=false 的禁用效果：除非你重新执行 Control enabled=true 指令、或者取消建筑与处理器的链接、或者拆除处理器，否则建筑会永久保持禁用（没有"时间耗尽"自动解锁）；
+  - 对 shoot、shootp 这类射击控制：指令执行一次就开一炮，开完炮塔就回到自己的正常射击AI（体感上像"临时控制几秒"，但这不是时间条）；
+  - 注意旧版/其他渠道常提到的"135tick建筑控制时间条"是对体感的概括，并非源码中的真实设计。
+3.附身限制：普通处理器控制的单位/建筑，玩家可附身控制；世界处理器控制的单位，玩家无法附身。
+
+-- 7.Radar注意事项：
+1.更新频率：输出结果：建筑Radar每30tick更新一次，单位Radar每40tick更新一次；如果你在更新间隔未结束前再次使用此指令也不会更新结果。
+2.特殊单位：埃里克尔的核心机无法被搜索到。
+
+-- 8.对于Select、Jump，其条件判断符在编辑器中的可选值为==、not、<、<=、>、>=、===、always。对于文本编写，其所用名称与op指令相对应，例如==用文本编写就是equal。条件判断符的作用与op指令相同。
+
+五、变量系统（含类型、内置变量）
+变量类型：
+1.number（数字）：支持负数、正数、浮点数；可表示真值（true/1）或假值（0/false）；null一般以0表示，除非遇到类似===这样的严格判断；存储精度为64位浮点数（双精度），位移操作时按64位有符号整数（长整型）运算。
+2.string（字符串）：需用""包裹，如"Hello,Mindustry!"；支持换行（\n），不支持转义字符。
+3.building（建筑）：指地图中实际存在的建筑物，需通过链接或指令（如GetLink、Sensor）获取。
+4.unit（单位）：指地图中实际存在的单位，需通过指令（如Radar、UnitBind）获取。
+5.content（内容）：非地图中实际存在的抽象内容，如物品（@copper）、建筑类型（@router）、单位类型（@poly），需用@调用。我们称这些内容的名称为内部名称，例如copper是铜，phase-conveyor是相织布传送带桥
+6.team（队伍）：表示游戏中的队伍（如@sharded、@derelict），需用@调用或通过Sensor获取。
+7.null（空值）：表示无内容，变量未赋值或目标不存在时为null，对应number类型的0。
+8.enum（枚举）：这个值很普通, 一般是在某些特殊的地方代表某一个具体的意义, 不用去深究（例如你用Set为名为value的变量赋值@x，那么他的变量类型就是enum）
+
+内置变量（环境变量，系统维护，大部分不可修改，部分可手动调整）：
+1.普通处理器与世界处理器共有的内置变量：
+- @this：此处理器自身（输出：building）
+- @thisx：此处理器的x坐标（输出：number）
+- @thisy：此处理器的y坐标（输出：number）
+- @links：此处理器链接的建筑总数（输出：number）
+- @ipt：此处理器的处理速度（每tick执行指令数，1秒=60tick；如微型处理器ipt=2，即120指令/秒，输出：number）
+- false：固定值0（输出：number）
+- true：固定值1（输出：number）
+- @pi：数学常数π（约3.14159，输出：number）
+- @e：数学常数e（约2.71828，输出：number）
+- @degToRad：角度制转弧度制的系数（输出：number）
+- @radToDeg：弧度制转角度制的系数（输出：number）
+- @time：当前存档的游戏时间（以毫秒为单位，输出：number）
+- @tick：当前存档的游戏时间（以tick为单位，输出：number）
+- @second：当前存档的游戏时间（以秒为单位，输出：number）
+- @minute：当前存档的游戏时间（以分钟为单位，输出：number）
+- @waveNumber：当前波数（输出：number）
+- @waveTime：波次倒计时（以秒为单位，输出：number）
+- @mapw：地图宽度（输出：number）
+- @maph：地图高度（输出：number）
+- @counter：指向处理器下一个执行的代码行号（如正在运行第5行，则@counter=6；可手动修改，用于控制指令执行顺序，输出：number）
+- @unit：当前处理器通过Unit Bind绑定的单位（输出：unit）
+- @itemCount：游戏内物品的类型总数（不含隐藏物品，输出：number）
+- @blockCount：游戏内建筑的类型总数（不含隐藏建筑，输出：number）
+- @unitCount：游戏内单位的类型总数（不含隐藏单位，输出：number）
+- @liquidCount：游戏内液体的类型总数（不含隐藏液体，输出：number）
+
+2.处理器常量（用于读取代号含义）：
+- @ctrlProcessor：值为1，表示单位/建筑被处理器控制
+- @ctrlPlayer：值为2，表示单位/建筑被玩家附身
+- @ctrlCommand：值为3，表示单位在指挥编队中
+
+3.仅世界处理器可用的内置变量：
+- @server：处理器是否在单人游戏或服务器中运行（输出：number）
+- @client：处理器是否在连接服务器的客户端上运行（输出：number）
+- @clientLocale：运行处理器的客户端区域设置（如zh_CN，输出：string）
+- @clientUnit：运行处理器的客户端玩家单位（输出：unit）
+- @clientName：运行处理器的客户端玩家名称（输出：string）
+- @clientTeam：运行处理器的客户端玩家队伍ID（输出：number）
+- @clientMobile：运行处理器的客户端是否为移动端（输出：number）
+- @queries：Query指令的查询结果（类型为对象序列，可通过Read指令遍历每个元素；仅在执行Query指令后有值，输出：对象序列）
+
+内置变量注意事项：
+- 部分内置变量仅在特定指令中可用（如Sensor的@x、@y），无法在其他指令（如Control、Op）中直接使用。
+- null对象在运算中会自动转为0（===运算除外，===会严格判断类型，null与0不相等）。
+
+4.其他内置常量（以下内容自动存在于全局命名空间中，可直接使用）：
+- π：数学常数π的别名，与@pi等价（输出：number）
+- @wait：等待指令的内部计时变量（此为特权隐藏变量，输出：null或number）
+- @colorRed、@colorBlue、@colorGreen等：以@color开头的颜色常量，值为打包后的颜色浮点数（如@colorRed对应红色的64位打包颜色值）。支持所有游戏内定义的颜色名称，格式为@color后跟首字母大写的颜色英文名（如@colorSky、@colorAcid、@colorGold等）。这些值可用于PackColor/UnpackColor相关的颜色操作。
+- @sfx-pew、@sfx-explosion等：以@sfx-开头的音效常量，值为对应音效的ID，用于Play Sound指令中的音效ID参数。支持所有游戏内加载的音效文件。
+
+六、各指令教学
+（注：所有指令均分别标注“编辑器”格式（游戏内代码块样式）和“文本”格式（游戏外文本编写样式），用法包含参数说明与示例，输出类型标注在指令名后）
+
+1.Read（输出：内存→number；信息板→number；画板→number；处理器→任意；此处理器中的字符串变量的某一位→number）
+作用：从目标（内存、信息板、画板、处理器、此处理器中的字符串变量）中读取数据，包括数字、字符编码、像素格颜色编号、变量值、字符串某一位的字符编码。
+编辑器：read [p1] = [p2] at [p3]
+文本：read [p1] [p2] [p3]
+用法：
+- [p1]：存储读取结果的变量名
+- [p2]：读取目标的变量名（如cell1（内存）、message1（信息板）、processor1（其他处理器））
+- [p3]：读取地址，不同目标的地址规则不同：
+  1.内存：地址为存储单元索引（0~存储单元数-1，如内存元为0~63）
+  2.信息板：地址为字符位置（0为首个字符，1为第二个字符，依次类推）
+  3.画板：地址为像素格索引（0~143）
+  4.其他处理器：地址为目标处理器内的变量名（需用""包裹，如"v"）
+  5.此处理器字符串变量：地址为字符位置（与信息板规则一致）
+示例：read 结果 cell1 0
+解释：从名为cell1的内存中，读取第0个存储单元的数字，存入“结果”变量。
+
+2.Write
+作用：向目标（内存、画板、处理器）写入数据，包括数字、颜色编号、变量值。
+编辑器：write [p1] to [p2] at [p3]
+文本：write [p1] [p2] [p3]
+用法：
+- [p1]：待写入的数据，可为数字字面量（如123）、变量名（如result）、字符串字面量（仅支持写入处理器变量）
+- [p2]：规则与Read的[p2]一致
+- [p3]：规则与Read的[p3]一致
+示例：write 5 cell1 0
+解释：向名为cell1的内存第0个存储单元，写入数字5。
+
+3.Draw
+作用：向绘图缓冲区写入绘图操作，需配合DrawFlush渲染到显示屏
+①编辑器：clear r[p1] g[p2] b[p3]
+文本：draw clear [p1] [p2] [p3]
+用法：清屏，将绘图缓冲区内容设为纯色；[p1]（r）、[p2]（g）、[p3]（b）为RGB分量（0~255，数字字面量或变量）
+示例：draw clear 255 0 0 → 绘图缓冲区设为纯红色
+
+②编辑器：color r[p1] g[p2] b[p3] a[p4]
+文本：draw color [p1] [p2] [p3] [p4]
+用法：设置后续绘图操作的颜色；[p1]（r）、[p2]（g）、[p3]（b）、[p4]（a）为RGBA分量（0~255，数字字面量或变量）。注意：在游戏编辑器中，若透明度分量设置为0，编辑器会自动将其重置为255（完全不透明），这是编辑器UI的限制，文本编写时不受此限制
+示例：draw color 0 255 0 200 → 后续绘图颜色设为半透明绿色
+
+③编辑器：col color [p1]
+文本：draw col [p1]
+用法：与Draw color指令功能一致，用于设置绘图颜色；[p1]为16进制颜色代码（需以%开头，如%ff0000代表红色，%00ff0080代表半透明绿色）
+示例：draw col %0000ff → 后续绘图颜色设为蓝色
+
+④编辑器：stroke [p1]
+文本：draw stroke [p1]
+用法：设置后续绘图操作的线条宽度；[p1]为数字字面量或变量（如2代表线条宽度为2像素）
+示例：draw stroke 3 → 后续线条绘图宽度设为3像素
+
+⑤编辑器：line x[p1] y[p2] x2[p3] y2[p4]
+文本：draw line [p1] [p2] [p3] [p4]
+用法：绘制线段；[p1]、[p2]为线段起点的xy坐标，[p3]、[p4]为线段终点的xy坐标（坐标单位为像素，支持变量或数字字面量）
+示例：draw line 10 10 50 50 → 从(10,10)到(50,50)绘制线段
+
+⑥编辑器：rect x[p1] y[p2] width[p3] height[p4]
+文本：draw rect [p1] [p2] [p3] [p4]
+用法：绘制实心矩形；[p1]、[p2]为矩形左下角的xy坐标，[p3]为宽度，[p4]为高度
+示例：draw rect 20 20 30 40 → 左下角(20,20)、宽30、高40的实心矩形
+
+⑦编辑器：lineRect x[p1] y[p2] width[p3] height[p4]
+文本：draw lineRect [p1] [p2] [p3] [p4]
+用法：绘制矩形轮廓；参数规则与rect一致
+示例：draw lineRect 20 20 30 40 → 左下角(20,20)、宽30、高40的矩形轮廓
+
+⑧编辑器：poly x[p1] y[p2] sides[p3] radius[p4] rotation[p5]
+文本：draw poly [p1] [p2] [p3] [p4] [p5]
+用法：绘制实心正多边形；[p1]、[p2]为多边形中心点xy坐标，[p3]为边数（如3为三角形、4为正方形），[p4]为半径，[p5]为旋转角度(!1-1)
+示例：draw poly 50 50 5 20 0 → 中心点(50,50)、5条边、半径20、方向右的实心正五边形
+
+⑨编辑器：linePoly x[p1] y[p2] sides[p3] radius[p4] rotation[p5]
+文本：draw linePoly [p1] [p2] [p3] [p4] [p5]
+用法：绘制正多边形轮廓；参数规则与poly一致
+示例：draw linePoly 50 50 6 25 0→ 中心点(50,50)、6条边、半径25、方向右的正六边形轮廓
+
+⑩编辑器：triangle x[p1] y[p2] x2[p3] y2[p4] x3[p5] y3[p6]
+文本：draw triangle [p1] [p2] [p3] [p4] [p5] [p6]
+用法：绘制实心三角形；[p1]、[p2]为左下角顶点xy坐标，[p3]、[p4]为右下角顶点xy坐标，[p5]、[p6]为顶部顶点xy坐标
+示例：draw triangle 10 10 30 10 20 30 → 左下角(10,10)、右下角(30,10)、顶部(20,30)的实心三角形
+
+❶编辑器：image x[p1] y[p2] image[p3] size[p4] rotation[p5]
+文本：draw image [p1] [p2] [p3] [p4] [p5]
+用法：绘制游戏内内容（如物品、单位图标）；[p1]、[p2]为图像中心点xy坐标，[p3]为内容标识（需为content类型变量，如@copper代表铜的图标），[p4]为图像大小（像素），[p5]为旋转角度(!1-1)；RGBA分量为0时显示原色彩
+示例：draw image 40 40 @copper 32 90 → 中心点(40,40)、显示铜图标、大小32像素、旋转90度（向上）
+
+❷编辑器：print x[p1] y[p2] align [p3]
+文本：draw print [p1] [p2] [p3]
+用法：将文本缓冲区内容打印到显示屏，并清空文本缓冲区；仅支持英文字符，不支持文本颜色（即使文本含颜色标记，也会原样打印），中文会视为空格。
+- [p1]、[p2]：打印坐标
+- [p3]：对齐方式（共9种：@topLeft（左上角对齐）、@top（顶部居中）、@topRight（右上角）、@left（左侧居中）、@center（完全居中）、@right（右侧居中）、@bottomLeft（左下角）、@bottom（底部居中）、@bottomRight（右下角））；对齐规则：如@bottomLeft代表文本左下角与给定坐标对齐，文本显示在坐标右上角
+示例：draw print 50 50 @center → 将文本缓冲区内容在(50,50)坐标居中打印
+
+❸编辑器：translate x[p1] y[p2]
+文本：draw translate [p1] [p2]
+用法：平移绘图缓冲区内容；[p1]（x方向）、[p2]（y方向）为平移距离，正数为右/上，负数为左/下；translate效果是累积的（每次translate会叠加到之前的偏移量上），需使用draw reset重置变换
+示例：draw translate 5 0 → 绘图缓冲区内容向右平移5像素
+
+❹编辑器：scale x[p1] y[p2]
+文本：draw scale [p1] [p2]
+用法：缩放绘图缓冲区内容；[p1]（水平方向）、[p2]（垂直方向）为缩放倍率（1=正常大小，<1缩小，>1放大；缩放精度为0.05，即实际缩放值会舍入到最近的0.05倍数，小于0.05的值无效，如0.04会变为0即不缩放）；scale效果也是累积的
+示例：draw scale 2 1.5 → 水平方向放大2倍，垂直方向放大1.5倍
+
+❺编辑器：rotate degrees[p1]
+文本：draw rotate [p1] [p2] [p3] [p4] [p5] [p6]
+用法：旋转绘图缓冲区内容；[p1]和[p2]对应x和y坐标参数（rotate不使用这两个参数，填任意值即可），[p3]为旋转角度（角度制，对应编辑器中的degrees），[p4]、[p5]、[p6]填任意值即可；正数为逆时针旋转，负数为顺时针旋转；旋转以当前变换中心（由translate确定，默认为(0,0)即屏幕左下角）为轴心；rotate效果也是累积的
+示例：draw rotate 0 0 90 0 0 0 → 绘图缓冲区内容绕当前变换中心逆时针旋转90度
+
+❻编辑器：reset
+文本：draw reset
+用法：重置绘图缓冲区的变换效果，清除translate、scale、rotate的作用，使画布坐标回归原始状态
+示例：draw reset → 清除之前的平移、缩放、旋转效果
+
+(!2)
+
+4.Print
+作用：向文本缓冲区写入文本，可写变量或字符串字面量
+编辑器：[p1]
+文本：print [p1]
+用法：
+- [p1]：可填字符串字面量（需用""包裹，如"Hello"）或变量名；不可同时混合字面量与变量；支持用"\n"表示换行（字符串不支持转义字符，如"\\n"会显示为“\”+换行，而非“\n”文本）
+- 文本颜色设置：支持两种颜色格式，一是颜色英文名（如[red]文本[]，最后的[]用于结束颜色附加），二是16进制代码（#RRGGBB或#RRGGBBAA，如#ff0000为红色）；颜色可叠加（如[red]红[blue]蓝[]红[]），默认颜色为白色。
+(!3)
+示例1：print "你好\n" → 向文本缓冲区写入“你好”并换行
+示例2：print "[blue]Hello[]" → 向文本缓冲区写入蓝色“Hello”
+示例3：print value → 向文本缓冲区写入“value”变量的值（例如value的值为number类型变量5，那么就会打印5）
+
+(!4)
+
+5.PrintChar
+作用：向文本缓冲区添加一个UTF-16字符，通过字符编码指定字符；也可传入content类型变量（如@copper）来打印该内容对应的emoji字符
+编辑器：char [p1]
+文本：printchar [p1]
+用法：[p1]为字符的UTF-16编码（数字字面量或变量），如80对应字符“P”，65对应“A”
+示例：printchar 65 → 向文本缓冲区添加字符“A”
+
+6.Format
+作用：创建带占位符的文本，替换文本缓冲区中的占位符，占位符为{0}~{9}，每次查找编号最小的占位符进行替换
+编辑器：[p1]
+文本：format [p1]
+用法：[p1]为待替换的内容，可为字符串字面量（如"Mindustry"）或变量名；当替换值为number类型时，若其值与四舍五入整数的差小于0.00001，则以整数形式显示（如3.0显示为3），否则显示完整浮点数；每次清空文本缓冲区后，占位符计数重置（从{0}开始）
+示例1：
+print "你好{0}" → 文本缓冲区内容：“你好{0}”
+format "Mindustry" → 替换{0}为“Mindustry”，文本缓冲区变为“你好Mindustry”
+示例2：
+print "你{0}{1}{2}{3}" → 文本缓冲区：“你{0}{1}{2}{3}”
+format "看" → 替换{0}为“看”，缓冲区：“你看{1}{2}{3}”
+format "啥" → 替换{1}为“啥”，缓冲区：“你看啥{2}{3}”
+format "呢？\n" → 替换{2}为“呢？\n”，缓冲区：“你看啥呢？\n{3}”
+format value → 替换{3}为“value”变量的值，缓冲区：“你看啥呢？\n[value的值]”
+
+7.DrawFlush
+作用：将绘图缓冲区内容渲染到显示屏，并清空绘图缓冲区
+编辑器：to[p1]
+文本：drawflush [p1]
+用法：[p1]为显示屏的变量名（如display1，需提前链接或通过指令获取）
+示例：drawflush display1 → 将绘图缓冲区内容渲染到display1显示屏，并清空缓冲区
+
+8.PrintFlush
+作用：将文本缓冲区内容打印到信息板，并清空文本缓冲区
+编辑器：to[p1]
+文本：printflush [p1]
+用法：[p1]为信息板的变量名（如message1，需提前链接或通过指令获取）
+示例：printflush message1 → 将文本缓冲区内容打印到message1信息板，并清空缓冲区
+
+9.GetLink（输出：building）
+作用：根据索引查找当前处理器链接的建筑，索引与链接顺序一致（先链接的建筑索引小，从0开始）。
+编辑器：[p1] = link#[p2]
+文本：getlink [p1] [p2]
+用法：
+- [p1]：存储结果的building类型变量（如targetBuild）
+- [p2]：建筑的链接索引（数字字面量或变量，0为第一个链接的建筑）
+示例：getlink targetBuild 0 → 将当前处理器链接的第0个建筑（首个链接的建筑）存入targetBuild变量
+
+(!5)
+
+10.Control (!6)
+作用：控制目标建筑的状态或行为，支持多种控制类型
+①编辑器：set enabled of[p1] to [p2]
+文本：control enabled [p1] [p2]
+用法：控制建筑的开关状态
+- [p1]：目标建筑的变量名（building类型，如turret1）
+- [p2]：开关状态（0/false为关闭，1/true或任意非null变量为开启）
+示例：control enabled turret1 1 → 开启turret1建筑（如炮塔）
+
+②编辑器：set shoot of[p1] x[p2] y[p3] shoot[p4]
+文本：control shoot [p1] [p2] [p3] [p4]
+用法：控制建筑向指定坐标射击
+- [p1]：目标建筑变量名（需为可射击建筑，如炮塔）
+- [p2]、[p3]：射击目标的xy坐标
+- [p4]：射击状态（0为瞄准，1为射击）
+示例：control shoot turret1 100 200 1 → 控制turret1向(100,200)坐标射击
+
+③编辑器：set shootp of[p1] unit[p2] shoot[p3]
+文本：control shootp [p1] [p2] [p3]
+用法：控制建筑根据提前量（也就是带预判）向目标单位/建筑射击
+- [p1]：目标建筑变量名（可射击建筑）
+- [p2]：目标单位/建筑的变量名（unit或building类型）
+- [p3]：射击状态（0为瞄准，1为射击）
+示例：control shootp turret1 enemyUnit 1 → 控制turret1带预判射击enemyUnit单位
+
+④编辑器：set config of[p1] to[p2]
+文本：control config [p1] [p2]
+用法：设置建筑的分类或配置（如物品源选择物品、载荷路由器设置方向）
+- [p1]：目标建筑变量名（如router1、itemSource1）
+- [p2]：配置值，需为content类型变量（如@copper代表铜，1代表路由器向上）；载荷路由器方向规则：(!1-2)
+示例1：control config itemSource1 @copper → 设置itemSource1物品源输出铜
+示例2：control config router1 1 → 设置router1载荷路由器旋转方向为向上
+
+⑤编辑器：set color of[p1] to[p2]
+文本：control color [p1] [p2]
+用法：设置照明器的颜色
+- [p1]：目标照明器建筑变量名
+- [p2]：颜色值，需为以%开头的16进制颜色代码（如%ff0000为红色）
+示例：control color light1 %00ff00 → 设置light1照明器为绿色
+
+11.Radar（输出：unit）
+作用：获取目标建筑雷达范围内的单位，支持筛选与排序。
+编辑器：from[p1] target[p2] and [p3] and [p4] order[p5] sort[p6] output[p7]
+文本：radar [p2] [p3] [p4] [p6] [p1] [p5] [p7]
+用法：
+- [p1]：雷达范围的基准建筑变量名（需为带雷达功能的建筑，如炮塔）
+- [p2]、[p3]、[p4]：搜索筛选项（多选组合，可选值：any（任意单位）、enemy（敌方单位）、ally（友方单位）、player（玩家附身操控单位）、attacker（有攻击能力的单位）、flying（空军单位）、boss（Boss单位）、ground（陆/海军单位））；示例：p1=enemy、p2=flying → 筛选“敌方空军”
+- [p5]：排序方向（1=从高到低，0=从低到高；距离排序时，1=最近，0=最远）
+- [p6]：排序标准（可选值：distance（距离基准建筑的距离）、health（当前生命值）、shield（护盾值）、armor（护甲值）、maxHealth（最大生命值））
+- [p7]：存储结果的unit类型变量
+示例：radar enemy flying any distance duo1 1 targetUnit → 以duo1为基准，搜索敌方空军单位，按距离从近到远排序，结果存入targetUnit变量
+
+(!7)
+
+12.Sensor（输出：任意类型）
+作用：获取目标对象（建筑、单位等）的具体数据，输出类型随获取参数不同而变化
+编辑器：[p1] = [p2] in [p3]
+文本：sensor [p1] [p2] [p3]
+用法：
+- [p1]：存储结果的变量名（变量类型随[type]变化）
+- [p2]：目标对象的变量名（可为building、unit、content）
+- [p3]：获取的参数类型，分四大类：
+  1.items（物品）：获取对象携带的目标物品数量，[p3]需为content类型变量（如@copper），输出：number
+  示例：sensor copperCount storehouse1 @copper → 获取storehouse1建筑中铜的数量，存入copperCount变量
+  2.liquids（流体）：获取对象携带的目标流体数量，[p3]需为content类型变量（如@water），输出：number
+  示例：sensor waterCount tank1 @water → 获取tank1建筑中水的数量，存入waterCount变量
+  3.other（其他）：获取对象的目标载荷数量，[p3]需为content类型变量（如@duo），输出：number
+  示例：sensor duoCount load1 @duo → 获取load1建筑中双管炮的数量，存入duoCount变量
+  4.data（数据）：获取对象的详细数据，[p3]为内置参数名（需加@，如@x、@health），输出类型随参数变化（下方统一列出所有支持的参数）
+
+Sensor支持的参数表：
+- health：当前生命值（输出：number）
+- maxHealth：最大生命值（输出：number）
+- shield：护盾值（输出：number）
+- armor：护甲值（输出：number）
+- team：所属队伍（输出：team）
+- x：对象在地图中的x坐标（输出：number）
+- y：对象在地图中的y坐标（输出：number）
+- rotation：旋转角度（输出：number）；规则：对于传送带、载荷路由器：(!1-2)；对于单位/炮塔：(!1-1)
+- type：目标类型（如路由器返回@router，输出：content）
+- id：对象的ID（输出：number）
+- dead：对象是否已失效（输出：number）
+- totalItems：对象内的物品总数（输出：number）
+- firstItem：建筑内第一个物品的类型（按ID从小到大排序，输出：content）
+- totalLiquids：对象内的流体总量（输出：number）
+- totalPower：电池电量（输出：number）
+- itemCapacity：对象的物品容量（输出：number）
+- liquidCapacity：建筑的流体容量（输出：number）
+- powerCapacity：建筑的电力容量（输出：number）
+- powerNetStored：电网的电量（输出：number）
+- powerNetCapacity：电网的电容量（输出：number）
+- powerNetIn：电网的每秒电力输入量（输出：number）
+- powerNetOut：电网的每秒电力输出量（输出：number）
+- ammo：弹药数量（输出：number）
+- ammoCapacity：弹药容量（输出：number）
+- currentAmmoType：弹药类型（输出：content）
+- memoryCapacity：内存的存储单元数（输出：number）
+- efficiency：建筑是否正在工作（与enabled区分：enabled是“允许工作”的开关状态，efficiency是“实际工作”状态，输出：number）
+- progress：建筑的工作进度（0~1，输出：number）
+- timescale：被超速器超速的倍率（输出：number）
+- size：对象的尺寸（建筑尺寸如2=2*2，字符串变量为长度，输出：number）
+- solid：建筑是否实心（如门关闭时为1，输出：number）
+- range：对象的雷达范围（输出：number）
+- shooting：对象是否正在射击（输出：number）
+- controlled：单位/建筑的控制状态（1=单位被处理器控制（对应@ctrlProcessor），2=单位/建筑被玩家附身（对应@ctrlPlayer），3=单位在指挥编队中（对应@ctrlCommand），0=其他情况，输出：number）
+- controller：控制者（若单位被处理器控制则返回对应的处理器，在编队中返回领队，其他情况返回自身，输出：building/unit）
+- name：对象的玩家名字（输出：string）
+- payloadCount：对象携带的载荷数量（输出：number）
+- payloadType：对象携带的第一个载荷的类型，按ID从小到大排序（输出：content）
+- totalPayload：对象已用的载荷容量（输出：number）
+- payloadCapacity：对象的载荷容量（输出：number）
+- enabled：建筑的开关状态（输出：number）
+- config：建筑当前配置（如分类器筛选的物品类型，载荷路由器的方向；输出类型随建筑不同而变化，可为content或number）
+- color：对象的颜色（输入content类型变量时，如@copper，可获取该内容的颜色；输出：number，为16进制颜色代码，变量表中不可见，显示为0）
+- flag：单位标记（输出：number）
+- operations：DrawFlush指令执行的累计次数。每次执行DrawFlush时计数器加1，无刷新间隔，即时更新。仅适用于LogicDisplay（逻辑显示屏、大型逻辑显示屏、逻辑显示单元）方块。（输出：number）
+- speed：单位当前的移动速度（输出：number）
+- mining：单位是否正在采矿（输出：number）
+- mineX：单位采矿点的x坐标（输出：number）
+- mineY：单位采矿点的y坐标（输出：number）
+- boosting：陆军单位是否开启助推（输出：number）
+- shootX：对象射击点的x坐标（输出：number）
+- shootY：对象射击点的y坐标（输出：number）
+- bufferSize：链接的信息板/显示屏中，未处理的缓冲区指令数（如3条Draw指令Flush后，值为3（刷新速度很快，暂时不知道多久可以刷新完毕，大概1s内？），输出：number）
+- displayWidth：显示屏的像素格宽度（输出：number）
+- displayHeight：显示屏的像素格高度（输出：number）
+- cameraWidth：玩家的视角宽度（地图格子单位，输出：number）
+- cameraHeight：玩家的视角高度（地图格子单位，输出：number）
+- cameraX：玩家的视角中心点x坐标（输出：number）
+- cameraY：玩家的视角中心点y坐标（输出：number）
+- velocityX：单位在x轴方向的运动速度（正负表方向，大小表速度，输出：number）
+- velocityY：单位在y轴方向的运动速度（正负表方向，大小表速度，输出：number）
+- heat：热量（如钍反应堆的热量，输出：number）
+- buildX：单位建造点的x坐标（输出：number）
+- buildY：单位建造点的y坐标（输出：number）
+- building：单位是否正在建筑内（如进入载荷方块时，返回所在的建筑，否则返回null，输出：building）
+- breaking：单位是否正在拆除方块（输出：number）
+- pingX：单位标记点的x坐标（输出：number）
+- pingY：单位标记点的y坐标（输出：number）
+- pingText：单位标记点的文本内容（输出：string）
+- maxUnits：队伍的最大单位数量（只能从核心上获取，输出：number）
+- selectedBlock：单位工厂当前选中的建筑类型（如单位工厂的建造项，输出：content）
+- selectedRotation：单位工厂当前选中的旋转角度（输出：number）
+- bulletLifetime：子弹剩余生命值（输出：number）
+- bulletTime：子弹存在时间（输出：number）
+
+示例：sensor turretHealth turret1 @health → 获取turret1炮塔的当前生命值，存入turretHealth变量
+
+13.Set
+作用：给变量赋值，若变量未存在，则隐式创建变量并赋值
+编辑器：[p1] = [p2]
+文本：set [p1] [p2]
+用法：
+- [p1]：变量名（自定义，如num、result）
+警告：变量名可以是文字，可以是符号，也可是文字加数字，但绝对不能是纯数字！
+- [p2]：赋值内容，可为数字字面量（如123、3.14）、字符串字面量（如"test"，需用""包裹）、变量名（如otherNum，将其他变量的值赋值给当前变量）
+提示：数字可以用二进制或十六进制来表示，例如0b101表示5，0xFF表示255。负数格式为-0b101表示-5，-0x80表示-128。还支持正数符号如+0b101表示5，+0xFF表示255。
+示例1：set num 100 → 创建“num”变量并赋值100（number类型）
+示例2：set str "Mindustry" → 创建“str”变量并赋值"Mindustry"（string类型）
+示例3：set num2 num → 将“num”变量的值（100）赋值给“num2”变量
+
+14.Operation（op，输出：number）
+作用：对1~2个参数执行数学运算或逻辑运算，支持一元运算（1个参数）和二元运算（2个参数）。
+①编辑器：[p1] = [p2] [p3] [p4]
+文本：op [p3] [p1] [p2] [p4]
+②编辑器：[p1] = [p3] [p2]
+文本：op [p3] [p1] [p2]
+用法：
+- [p1]：存储运算结果的变量名（number类型）
+- [p2]、[p4]：运算参数，可为数字字面量（如5、3.14）、变量名（如num1、num2）、content类型变量（如@copper，仅部分运算支持，如equal比较对象时）
+- [p3]：运算操作符，分二元运算和一元运算，具体如下：
+格式：编辑器显示内容/文本参数/解释/参数数量
+
++ / add / 加法 / 2 → 示例：op add sum 3 5 → sum=8
+- / sub / 减法 / 2 → 示例：op sub diff 10 4 → diff=6
+* / mul / 乘法 / 2 → 示例：op mul prod 2 7 → prod=14
+/ / div / 浮点除法（除以0时结果按0处理） / 2 → 示例：op div res 7 2 → res=3.5；op div res 5 0 → res=0
+// / idiv / 整数除法（结果向下取整） / 2 → 示例：op idiv res 7 2 → res=3；op idiv res -7 2 → res=-4
+% / mod / 取余（结果符号跟随[p2]） / 2 → 示例：op mod res 5 2 → res=1；op mod res -5 2 → res=-1
+%% / emod / 取模（结果恒为非负） / 2 → 示例：op emod res -5 2 → res=1
+^ / pow / 幂运算 / 2 → 示例：op pow res 2 3 → res=8
+== / equal / 相等（转换类型后比较：数字按浮点精度（误差<0.000001）比较，content类型变量（如@copper、@iron）或建筑/单位对象按实际类型与值比较；非null对象按1计，null按0计；相等返回1，不等返回0） / 2 → 示例1：op equal res 5.0000001 5 → res=1（浮点误差内相等）；示例2：op equal res @copper @iron → res=0（content类型不同）；示例3：op equal res 5 "5" → res=0（数字与字符串转换后不相等，字符串"5"按1计）
+not / notEqual / 不相等（转换类型后比较，规则同equal） / 2 → 示例：op notEqual res 5 3 → res=1
+and / land / 逻辑与（非0值按1计，0按0计；两者均为1时返回1，否则返回0） / 2 → 示例：op land res 2 3 → res=1；op land res 0 5 → res=0
+< / lessThan / 是否小于（数字比较，非数字按0计） / 2 → 示例：op lessThan res 3 5 → res=1
+<= / lessThanEq / 是否小于等于（数字比较，非数字按0计） / 2 → 示例：op lessThanEq res 5 5 → res=1
+> / greaterThan / 是否大于（数字比较，非数字按0计） / 2 → 示例：op greaterThan res 7 4 → res=1
+>= / greaterThanEq / 是否大于等于（数字比较，非数字按0计） / 2 → 示例：op greaterThanEq res 4 5 → res=0
+=== / strictEqual / 严格相等（不转换类型：数字仅与数字相等，字符串仅与字符串相等，content类型变量仅与相同类型相等） / 2 → 示例1：op strictEqual res 5 "5" → res=0（数字vs字符串类型不同）；示例2：op strictEqual res 5.0 5 → res=1（均为数字且值相等）
+<< / shl / 左移位（[p2]需为整数，按位左移[p4]位） / 2 → 示例：op shl res 4 1 → 4（二进制100）左移1位=8（二进制1000），res=8
+>> / shr / 右移位（[p2]需为整数，按位右移[p4]位） / 2 → 示例：op shr res 8 1 → 8（二进制1000）右移1位=4（二进制100），res=4
+>>> / ushr / 无符号右移位（[p2]需为整数，0填充空位，按位右移[p4]位） / 2 → 示例：op ushr res -4 1 → res=2147483646
+or / or / 按位或（[p2]、[p4]需为整数，对应位有1则为1） / 2 → 示例：op or res 3（11） 5（101） → res=7（111）
+b-and / and / 按位与（[p2]、[p4]需为整数，对应位均为1则为1） / 2 → 示例：op and res 4（100） 6（110） → res=4（100）
+xor / xor / 按位异或（[p2]、[p4]需为整数，对应位不同则为1） / 2 → 示例：op xor res 8（1000） 5（0101） → res=13（1101）
+flip / not / 对整数参数按位取反（每一位0变1、1变0） / 1 → 示例：op flip res 5（101） → res=-6（二进制补码表示）
+max / max / 取最大值（数字比较，非数字按0计） / 2 → 示例：op max res 5 3 → res=5
+min / min / 取最小值（数字比较，非数字按0计） / 2 → 示例：op min res 5 3 → res=3
+angle / angle / 计算从地图原点(0,0)到（[p2]、[p4]）坐标的角度（角度制，范围0~360） / 2 → 示例：op angle res 1 1 → res=45
+anglediff / angleDiff / 计算两个角度（[p2]、[p4]）的最短差值（角度制，结果非负，范围0~180） / 2 → 示例：op anglediff res 90 45 → res=45；op anglediff res 350 10 → res=20
+len / len / 计算从地图原点(0,0)到（[p2]、[p4]）坐标的直线距离 / 2 → 示例：op len res 3 4 → res=5
+noise / noise / 计算（[p2]、[p4]）坐标的2D Simplex噪声值，结果范围-1~1 / 2 → 示例：op noise res 1 1 → 结果为-1~1间的随机浮点数
+abs / abs / 取参数的绝对值（非数字按0计） / 1 → 示例：op abs res -5 → res=5；op abs res "test" → res=0
+sign / sign / 取参数的符号（正数返回1，负数返回-1，0或非数字返回0） / 1 → 示例：op sign res -5 → res=-1；op sign res 3.2 → res=1；op sign res 0 → res=0
+log / log / 计算参数的自然对数（参数需大于0，否则结果按0计） / 1 → 示例：op log res 1 → res=0；op log res 0 → res=0
+logn / logn / 计算自然对数比值：ln([p2])÷ln([p4])，即计算以[p4]为底、[p2]为真数的对数（两者均需大于0，否则结果按0计） / 2 → 示例：op logn res 8 2 → res=3（log₂8=3）；op logn res 2 0 → res=0
+log10 / log10 / 计算参数的以10为底的对数（参数需大于0，否则结果按0计） / 1 → 示例：op log10 res 100 → res=2；op log10 res -5 → res=0
+floor / floor / 对参数向下取整（非数字按0计） / 1 → 示例：op floor res 3.7 → res=3；op floor res -2.1 → res=-3
+ceil / ceil / 对参数向上取整（非数字按0计） / 1 → 示例：op ceil res 3.2 → res=4；op ceil res -1.8 → res=-1
+round / round / 对参数四舍五入（非数字按0计） / 1 → 示例：op round res 3.5 → res=4；op round res 2.4 → res=2
+sqrt / sqrt / 计算参数的平方根（参数需为非负数，否则结果按0计） / 1 → 示例：op sqrt res 9 → res=3；op sqrt res -4 → res=0
+rand / rand / 生成[0,参数)范围内的随机浮点数（含0不含参数，参数需为非负数，否则结果按0计；输出离散程度极高） / 1 → 示例：op rand res 10 → 结果为0~10间的随机浮点数（如5.5）；op rand res -3 → res=0
+sin / sin / 计算参数的正弦值（角度制，结果范围-1~1；非数字按0计） / 1 → 示例：op sin res 30 → res=0.5；op sin res 90 → res=1
+cos / cos / 计算参数的余弦值（角度制，结果范围-1~1；非数字按0计） / 1 → 示例：op cos res 60 → res=0.5；op cos res 0 → res=1
+tan / tan / 计算参数的正切值（角度制；非数字按0计） / 1 → 示例：op tan res 45 → res=1；op tan res 90 → 结果按0计
+asin / asin / 计算参数的反正弦值（角度制，结果范围-90~90；参数需在-1~1之间，否则结果按0计） / 1 → 示例：op asin res 0.5 → res=30；op asin res 2 → res=0
+acos / acos / 计算参数的反余弦值（角度制，结果范围0~180；参数需在-1~1之间，否则结果按0计） / 1 → 示例：op acos res 0.5 → res=60；op acos res -1 → res=180
+atan / atan / 计算参数的反正切值（角度制，结果范围-90~90；非数字按0计） / 1 → 示例：op atan res 1 → res=45；op atan res -1 → res=-45
+
+15.Select（输出：任意类型）
+作用：根据条件选择两个值中的一个，实现简单的条件判断功能。
+编辑器：[p1] = if [p2] [p3] [p4] then [p5] else [p6]
+文本：select [p1] [p3] [p2] [p4] [p5] [p6]
+用法：
+- [p1]：存储结果的变量名
+- [p2]：条件判断的第一个值
+- [p3]：条件操作符（!8）
+- [p4]：条件判断的第二个值
+- [p5]：条件为真时的返回值
+- [p6]：条件为假时的返回值
+示例：select result equal health 50 goodValue badValue
+解释：如果health变量的值等于50，将goodValue的值赋给result，否则将badValue的值赋给result
+
+16.Lookup（输出：content、team）
+作用：根据ID查找游戏内容（物品、建筑、单位、流体、队伍），返回对应的content或team类型变量。
+编辑器：[p1] = lookup [p2] # [p3]
+文本：lookup [p1] [p2] [p3]
+用法：
+- [p1]：存储结果的变量名
+- [p2]：内容类型（可选值：item、liquid、unit、block、team）
+- [p3]：内容的ID
+示例：lookup result item 0
+解释：查找ID为0的物品，结果存入result变量
+
+17.Pack Color（输出：number）
+作用：将RGBA颜色分量打包为一个64位浮点数，便于存储和传输。
+编辑器：[p1] = pack [p2] [p3] [p4] [p5]
+文本：packcolor [p1] [p2] [p3] [p4] [p5]
+用法：
+- [p1]：存储结果的变量名
+- [p2]：红色分量（0~1，数字字面量或变量）
+- [p3]：绿色分量（0~1，数字字面量或变量）
+- [p4]：蓝色分量（0~1，数字字面量或变量）
+- [p5]：透明度分量（0~1，数字字面量或变量）
+示例：packcolor result 1 0 0 1
+解释：将红色（不透明）打包为浮点数，结果存入result变量
+提示：打包后的数字较为特殊，其值在变量表中不可见，表现为一个值为0的number类型变量
+
+18.Unpack Color（输出：number）
+作用：将打包的颜色浮点数解包为RGBA四个分量。
+编辑器：[p1] [p2] [p3] [p4] = unpack [p5]
+文本：unpackcolor [p1] [p2] [p3] [p4] [p5]
+用法：
+- [p1]：存储红色分量的变量名（number类型，0~1）
+- [p2]：存储绿色分量的变量名（number类型，0~1）
+- [p3]：存储蓝色分量的变量名（number类型，0~1）
+- [p4]：存储透明度分量的变量名（number类型，0~1）
+- [p5]：打包的颜色浮点数
+示例：unpackcolor r g b a packedColor
+解释：将packedColor变量中的打包颜色解包为RGBA四个分量，分别存入r、g、b、a变量
+
+19.Wait
+作用：暂停逻辑执行指定时间，时间结束后继续执行下一条指令。
+编辑器：[p1] sec
+文本：wait [p1]
+用法：
+- [p1]：等待时间
+示例：wait 2.5
+解释：暂停逻辑执行2.5秒，然后继续执行下一条指令
+
+20.Stop
+作用：立即停止逻辑执行，处理器将不再执行任何指令
+编辑器和文本均为stop
+
+21.End
+作用：将@counter设置为指令总数，使处理器在下一个tick重新从第一条指令开始执行。
+编辑器和文本均为end
+
+22.Jump
+作用：根据条件跳转到指定指令行，实现循环和分支逻辑。
+编辑器：if [p3] [p2] [p4] → [p1]
+　　　注意：编辑器参数顺序与文本格式不同——编辑器中 第一个值 在前，但文本格式中 目标行号 在前。
+文本：jump [p1] [p2] [p3] [p4]
+用法（按文本格式顺序）：
+- [p1]：目标指令行号（从0开始计数；若未指定目标，值为-1）
+- [p2]：条件操作符（详见下方条件操作符表）
+- [p3]：条件判断的第一个值（value）
+- [p4]：条件判断的第二个值（compare）
+示例：jump 0 equal count 10
+解释：如果count变量的值等于10，跳转到第0行指令执行，实现循环逻辑
+
+23.Unit Bind（输出：unit）
+作用：将处理器绑定到全图范围内与处理器同队伍的指定类型的某个单位，也可以绑定一个具体的与处理器同队伍的单位，绑定后可通过@unit变量访问该单位。
+编辑器：type [p1]
+文本：ubind [p1]
+用法：
+- [p1]：单位类型（content类型变量，如@poly、@dagger，也可以是一个具体的单位变量）
+示例：ubind @poly
+解释：将处理器绑定到一个poly类型的单位
+注意：有个很经典的认知错误，对于指定类型的单位绑定，处理器不是一下子把所有同类型的单位都绑定了，而是执行一次这个指令绑定一个，因为处理器的处理速度很快，在指令数较少的情况下你可能会以为处理器是一下子把全部单位都绑定了。对于处理器绑定一个类型的单位的顺序，不好深究，你只需要知道处理器会按照某种顺序在每次执行一次这个指令的时候绑定一个新的同类型单位，如此往复，直到所有同类型的单位都绑定过后，再重新绑定一次。
+
+24.Unit Control (!6)
+作用：控制已绑定的单位执行各种操作
+编辑器：[p1] [p2] [p3] [p4] [p5] [p6]
+文本：ucontrol [p1] [p2] [p3] [p4] [p5] [p6]
+用法：
+- [p1]：控制类型（可选值：move、stop、approach、pathfind、autoPathfind、idle、boost、mine、target、targetp、within、flag、payDrop、payTake、payEnter、getBlock、itemDrop、itemTake、build、deconstruct、unbind）
+- [p2-p6]：根据控制类型不同，参数数量和含义不同，具体如下：
+  1.move：移动到指定坐标（径直移动，不寻路）
+    - p2：目标x坐标
+    - p3：目标y坐标
+  2.stop：停止一切操作
+    - 无额外参数
+  3.approach：围绕指定坐标（径直移动，不寻路）
+    - p2：目标x坐标
+    - p3：目标y坐标
+    - p4：围绕范围
+  4.pathfind：寻路到指定坐标
+    - p2：目标x坐标
+    - p3：目标y坐标
+  5.autoPathfind：自动寻路到最近的敌方核心或敌人生成点（与波次敌人的寻路行为相同）
+    - 无额外参数
+  6.idle：原地不动，但继续采矿、建造、射击等操作
+    - 无额外参数
+  7.boost：开启/关闭助推
+    - p2：是否开启
+  8.mine：在指定坐标采矿
+    - p2：采矿点x坐标
+    - p3：采矿点y坐标
+  9.target：攻击指定坐标
+    - p2：目标x坐标
+    - p3：目标y坐标
+    - p4：是否射击
+  10.targetp：攻击指定目标（带预判）
+    - p2：目标单位或建筑
+    - p3：是否射击（提示：目标在单位的雷达范围内才会射击，否则只会瞄准，而且这个瞄准还不管距离，哪怕和目标相距1000多格都能瞄准。或许可以用来做雷达？）
+  11.within：判断是否在指定范围内
+    - p2：目标x坐标
+    - p3：目标y坐标
+    - p4：范围
+    - p5：存储结果的变量
+  12.flag：设置单位标记
+    - p2：标记值（只能为数字，可以是负数，不能是浮点数，若是浮点数则取整数，若值不是数字，比如content类型变量，则其值不为null、0、false时其值均取1）
+  13.payDrop：放下携带的载荷
+    - 无额外参数
+  14.payTake：拾取附近的载荷
+    - p2：是否拾取单位
+  15.payEnter：进入指定建筑
+    - p2：目标建筑
+  16.getBlock：获取指定位置的地块信息（不在单位雷达范围内无法获取）
+    - p2：目标x坐标
+    - p3：目标y坐标
+    - p4：存储块的content类型变量，若无块则为@air
+    - p5：存储块的building类型变量
+    - p6：存储地板/覆盖层的content类型变量（有覆盖层时返回覆盖层，无覆盖层时返回地板）
+  17.itemDrop：放下携带的物品
+    - p2：目标建筑
+    - p3：物品数量
+  18.itemTake：从指定建筑拾取物品
+    - p2：目标建筑
+    - p3：物品类型
+    - p4：物品数量
+  19.build：建造指定建筑
+    - p2：目标x坐标
+    - p3：目标y坐标
+    - p4：建筑类型（可填写@this使单位建造一个处理器的克隆体）
+    - p5：旋转角度(!1)
+    - p6：建筑的配置
+  20.deconstruct：拆除指定位置的建筑（需要规则中启用单位拆除建筑，在自定义规则中默认关闭）
+    - p2：目标x坐标
+    - p3：目标y坐标
+  21.unbind：解除单位绑定，恢复单位原始AI
+    - 无额外参数
+示例1：ucontrol move 100 200
+解释：控制已绑定的单位移动到(100,200)坐标
+示例2：ucontrol target Unit 1
+解释：控制已绑定的单位射击Unit单位
+
+25.Unit Radar（输出：unit） (!6)
+作用：获取已绑定单位雷达范围内的单位，支持筛选与排序。
+编辑器：target [p1] and [p2] and [p3] order [p4] sort [p5] output [p6]
+文本：uradar [p1] [p2] [p3] [p5] 0 [p4] [p6]
+用法：与Radar指令基本相同，不过多赘述。
+示例：uradar enemy flying any distance 1 targetUnit
+解释：以已绑定单位为基准，搜索敌方空军单位，按距离从近到远排序，结果存入targetUnit变量
+
+26.Unit Locate（输出：number、building） (!6)
+作用：让已绑定的单位查找指定类型的目标，返回目标坐标和相关信息。
+编辑器：[p1] [p2] [p3] [p4] outX [p5] outY [p6] found [p7] building [p8]
+文本：ulocate [p1] [p2] [p3] [p4] [p5] [p6] [p7] [p8]
+用法：
+- [p1]：查找类型，可选值：ore（矿物）、building（建筑）、spawn（敌人生成点）、damaged（受损建筑）
+- 根据查找类型不同，[p2]-[p8]的参数含义也不同，具体如下：
+
+①查找类型：ore（矿物）
+  编辑器：find ore [p2] outX [p5] outY [p6] found [p7]
+  用法：
+  - p2：矿物类型（content类型变量，如@copper）
+  - p5（outX）：目标的x坐标（number类型变量）
+  - p6（outY）：目标的y坐标（number类型变量）
+  - p7（found）：是否找到了矿物（number类型变量，1=找到，0=未找到）
+  剩余参数[p3]、[p4]、[p8]在ore模式中不使用，填任意值即可。
+  示例：ulocate ore @copper 0 0 targetX targetY found 0
+  解释：让已绑定的单位查找最近的铜矿，坐标存入targetX和targetY变量，结果存入found变量
+
+②查找类型：building（建筑）
+  编辑器：find building group [p2] enemy [p3] outX [p5] outY [p6] found [p7] building [p8]
+  文本：ulocate building [p2] [p3] [p4] [p5] [p6] [p7] [p8]
+  用法：
+  - p2（group）：建筑分类（可选值：core（核心）、storage（仓储）、generator（发电机）、turret（炮塔）、factory（工厂）、repair（维修点）、battery（电池）、reactor（反应堆）、drill（钻头）、shield（护盾））
+  - p3（enemy）：是否查找敌方建筑（1/true=敌方，0/false=己方）
+  - p4：占位参数，填任意值
+  - p5（outX）：建筑x坐标
+  - p6（outY）：建筑y坐标
+  - p7（found）：是否找到
+  - p8（building）：找到的建筑对象
+  示例：ulocate building core true 0 targetX targetY found targetBuilding
+  解释：让已绑定的单位查找最近的敌方核心，坐标存入targetX和targetY，找到的建筑存入targetBuilding
+
+③查找类型：spawn（敌人生成点）
+  编辑器：find spawn outX [p5] outY [p6] found [p7]
+  用法：
+  - [p2]-[p4]：占位参数，填任意值
+  - p5（outX）：生成点的x坐标
+  - p6（outY）：生成点的y坐标
+  - p7（found）：是否找到
+  - [p8]：占位参数，填任意值
+  示例：ulocate spawn 0 0 0 targetX targetY found 0
+  解释：让已绑定的单位查找最近的敌人生成点
+
+④查找类型：damaged（受损建筑）
+  编辑器：find damaged outX [p5] outY [p6] found [p7] building [p8]
+  用法：
+  - [p2]-[p4]：占位参数，填任意值
+  - p5（outX）：受损建筑的x坐标
+  - p6（outY）：受损建筑的y坐标
+  - p7（found）：是否找到
+  - p8（building）：找到的受损建筑对象（building类型变量）
+  示例：ulocate damaged 0 0 0 targetX targetY found damagedBuilding
+  解释：让已绑定的单位查找最近的己方受损建筑
+
+27.Query（输出：无直接输出，结果存入@queries）
+作用：查询指定区域内的单位或建筑，结果存入@queries变量供后续使用。这是特权指令，需要世界处理器。
+编辑器：[p1] [p2] team [p3] x [p4] y [p5] [p6] [p7]
+文本：query [p1] [p2] [p3] [p4] [p5] [p6] [p7]
+用法：
+- [p1]：查询形状（可选值：circle（圆形）、rect（矩形））
+- [p2]：查询类型（可选值：unit（单位）、building（建筑））
+- [p3]：队伍（如@sharded、@derelict，填null查询所有队伍）
+- [p4]：区域中心x坐标（地图格子单位）或形状为矩形时左下角的x坐标
+- [p5]：区域中心y坐标（地图格子单位）或形状为矩形时左下角的y坐标
+- [p6]：区域宽度（地图格子单位）或半径（当形状为circle时）
+- [p7]：区域高度（地图格子单位，矩形时有效，圆形时忽略）
+查询结果存入@queries变量，可通过Read指令遍历其中的每个元素，需要使用Read的索引功能来查询不同的元素，可使用Sensor的@size参数获取总共的元素数量。注意：当查询类型为building时，处理器自身也算做元素
+示例：query circle unit @sharded 50 50 20 0
+解释：查询(50,50)为中心、半径20格范围内的sharded队伍单位，结果存入@queries
+
+28.Get Block（输出：block/floor/overlay/building）
+作用：获取指定位置的方块信息，支持不同图层（方块层、地形层、覆盖层、建筑层）。这是特权指令，需要世界处理器。
+编辑器：[p1] = get [p2] at [p3], [p4]
+文本：getblock [p1] [p3] [p4] [p2]
+用法：
+- [p1]：存储结果的变量名
+- [p2]：图层类型（可选值：block、floor、ore、building）
+- [p3]：目标x坐标（地图格子单位）
+- [p4]：目标y坐标（地图格子单位）
+示例1：getblock result block 10 20
+解释：获取(10,20)位置的方块类型，结果存入result变量
+示例2：getblock result building 15 25
+解释：获取(15,25)位置的建筑，结果存入result变量
+
+29.Set Block（输出：无）
+作用：修改指定位置的方块信息，支持不同图层（方块层、地形层、覆盖层）。这是特权指令，需要世界处理器。
+编辑器：set [p1] at [p2], [p3] to [p4] team [p5] rotation [p6]
+文本：setblock [p1] [p2] [p3] [p4] [p5] [p6]
+用法：
+- [p1]：图层类型（可选值：block、floor、ore）
+- [p2]：目标x坐标（地图格子单位）
+- [p3]：目标y坐标（地图格子单位）
+- [p4]：方块类型（content类型变量，如@copperWall、@grass）
+- [p5]：队伍（仅当p1为block时有效，如@sharded、@derelict）
+- [p6]：旋转角度（仅当p1为block时有效，0~3）
+示例1：setblock block 10 20 @copperWall @sharded 0
+解释：在(10,20)位置放置铜墙，队伍为sharded，旋转角度为0
+示例2：setblock ore 15 25 @copper
+解释：在(15,25)位置放置铜矿覆盖层
+
+30.Spawn Unit（输出：unit）
+作用：在指定位置生成指定类型的单位。这是特权指令，需要世界处理器。
+编辑器：[p1] = spawn [p2] at [p3], [p4] team [p5] rot [p6]
+文本：spawn [p1] [p2] [p3] [p4] [p5] [p6]
+用法：
+- [p1]：存储生成单位的变量名（unit类型）
+- [p2]：单位类型（content类型变量，如@dagger、@poly）
+- [p3]：生成位置x坐标（地图格子单位）
+- [p4]：生成位置y坐标（地图格子单位）
+- [p5]：队伍（如@sharded、@derelict）
+- [p6]：旋转角度（角度制）
+示例：spawn newUnit @dagger 10 20 @sharded 90
+解释：在(10,20)位置生成dagger类型的单位，队伍为sharded，旋转角度为90度，结果存入newUnit变量
+
+31.Spawn Bullet（输出：bullet）
+作用：在指定位置生成子弹（如炮塔弹药），可自定义伤害、速度、生命值等。这是特权指令，需要世界处理器。
+编辑器：[p1] = bullet from [p2] index [p3] x [p4] y [p5] rotation [p6] team [p7] owner [p8] damage [p9] velocityScl [p10] lifeScl [p11] aimX [p12] aimY [p13]
+文本：spawnbullet [p1] [p2] [p3] [p4] [p5] [p6] [p7] [p8] [p9] [p10] [p11] [p12] [p13]
+用法：
+- [p1]：存储生成子弹的变量名（bullet类型）
+- [p2]：子弹来源（可为unit类型变量如@dagger、炮塔建筑变量、或物品类型）
+- [p3]：子弹索引（当from为单位类型时，为武器索引；当from为炮塔时，为弹药物品或液体类型）
+- [p4]：生成位置x坐标（地图格子单位）
+- [p5]：生成位置y坐标（地图格子单位）
+- [p6]：发射旋转角度（角度制）
+- [p7]：所属队伍（如@sharded）。若队伍为null但owner有效，则使用owner的队伍。
+- [p8]：子弹拥有者（可为单位或建筑，决定击杀归属）
+- [p9]：伤害值（为负数时表示使用默认伤害）
+- [p10]：速度缩放倍率
+- [p11]：生命值缩放倍率
+- [p12]：瞄准点x坐标（-1表示不指定）
+- [p13]：瞄准点y坐标（-1表示不指定）
+示例：spawnbullet result @dagger 0 50 50 0 @sharded null -1 1 1 -1 -1
+解释：从dagger单位的0号武器生成默认伤害的子弹，位置(50,50)，角度0
+
+32.Apply Status（输出：无）
+作用：为指定单位添加或清除状态效果。这是特权指令，需要世界处理器。
+编辑器：[p1] [p2] to [p3] for [p4] sec
+文本：status [p1] [p2] [p3] [p4]
+用法：
+- [p1]：操作类型（apply=添加状态，clear=清除状态）
+- [p2]：状态效果名称（如wet、burning、speed、slow）
+- [p3]：目标单位（unit类型变量）
+- [p4]：状态持续时间（秒，仅当p1为apply时有效）
+示例1：status apply speed myUnit 10
+解释：为myUnit单位添加10秒的加速状态
+示例2：status clear burning enemyUnit
+解释：清除enemyUnit单位的燃烧状态
+
+33.Weather Sense（输出：number）
+作用：检测指定天气是否正在生效。这是特权指令，需要世界处理器。
+编辑器：[p1] = weather [p2]
+文本：weathersense [p1] [p2]
+用法：
+- [p1]：存储结果的变量名（number类型，1=生效，0=未生效）
+- [p2]：天气类型（content类型变量，如@rain、@snow、@sandstorm）
+示例：weathersense isRaining @rain
+解释：检测雨天气是否正在生效，结果存入isRaining变量
+
+34.Weather Set（输出：无）
+作用：开启或关闭指定天气。这是特权指令，需要世界处理器。
+编辑器：set weather [p1] state [p2]
+文本：weatherset [p1] [p2]
+用法：
+- [p1]：天气类型（content类型变量，如@rain、@snow、@sandstorm）
+- [p2]：天气状态（1=开启，0=关闭）
+示例1：weatherset @rain 1
+解释：开启雨天气
+示例2：weatherset @sandstorm 0
+解释：关闭沙暴天气
+
+35.Spawn Wave（输出：无）
+作用：生成一波敌人，支持自然生成和指定位置生成。这是特权指令，需要世界处理器。
+编辑器：natural [p1] x [p2] y [p3]
+文本：spawnwave [p1] [p2] [p3]
+用法：
+- [p1]：是否自然生成（1=是，使用地图预设的生成点；0=否，使用指定位置）
+- [p2]：生成位置x坐标（仅当p1为0时有效，地图格子单位）
+- [p3]：生成位置y坐标（仅当p1为0时有效，地图格子单位）
+示例1：spawnwave 1 0 0
+解释：自然生成一波敌人
+示例2：spawnwave 0 100 200
+解释：在(100,200)位置生成一波敌人
+
+36.Set Rule（输出：无）
+作用：修改游戏规则，如波次间隔、单位上限、建筑速度等。这是特权指令，需要世界处理器。
+编辑器：根据规则类型不同而变化，通用格式为 [p1] = [p2]
+文本：setrule [p1] [p2] [p3] [p4] [p5] [p6]
+用法：
+- [p1]：规则类型，可选值如下：
+  通用规则（仅需p1和p2两个参数，p1=规则名，p2=规则值）：
+    waveSpacing：波次间隔（秒）
+    waveTimer：波次计时器是否启用（1=启用，0=禁用）
+    waves：是否允许波次（1=允许，0=禁止）
+    wave：当前波次（可设置任意值）
+    currentWaveTime：当前波次倒计时（秒）
+    waveSending：是否可通过按钮来下一波次（1=是，0=否）
+    attackMode：是否为进攻模式（1=是，0=否）
+    enemyCoreBuildRadius：敌方核心禁止建筑范围半径（地图格）
+    dropZoneRadius：敌方空降区半径（地图格）
+    unitCap：基本单位数量上限
+    lighting：是否启用环境光（1=启用，0=禁用）
+    canGameOver：是否允许游戏结束（1=允许，0=禁止）
+    pauseDisabled：是否禁止暂停（1=禁止，0=允许）
+    ambientLight：环境光颜色（使用PackColor打包的颜色值）
+    solarMultiplier：太阳能发电倍率
+    dragMultiplier：阻力倍率
+
+  需要指定队伍的规则（需p1和p3两个参数，p3为队伍）：
+    buildSpeed：建造速度倍率（p2=倍率值，p3=队伍）
+    unitHealth：单位生命值倍率（p2=倍率值，p3=队伍）
+    unitBuildSpeed：单位制造速度倍率（p2=倍率值，p3=队伍）
+    unitMineSpeed：单位采矿速度倍率（p2=倍率值，p3=队伍）
+    unitCost：单位制造成本倍率（p2=倍率值，p3=队伍）
+    unitDamage：单位伤害倍率（p2=倍率值，p3=队伍）
+    blockHealth：建筑生命值倍率（p2=倍率值，p3=队伍）
+    blockDamage：建筑伤害倍率（p2=倍率值，p3=队伍）
+    rtsMinWeight：RTS部队发动攻击所需最小优势权重
+    rtsMinSquad：RTS攻击小队最小规模
+  需要多个参数的特殊规则：
+    mapArea：设置地图可用区域，如果设定的值超过地图本身最大大小，那么仍会使用地图的最大大小，不会进行扩展。地图有效区域外的所有块将会被停用，世界处理器除外，若有效区域外有玩家队伍的单位会被挤回有效区域内，非玩家队伍不受影响（p1=规则名，p2=x坐标，p3=y坐标，p4=宽度，p5=高度）
+    ban：禁用单位或建筑（p1=规则名，p2=目标content类型变量）
+    unban：解禁单位或建筑（p1=规则名，p2=目标content类型变量）
+示例1：setrule waveSpacing 30
+解释：设置波次间隔为30秒
+示例2：setrule unitCap 100
+解释：设置单位上限为100
+示例3：setrule unitHealth 2 @sharded
+解释：将sharded队伍的单位生命值倍率设为2
+
+37.Flush Message（输出：number）
+作用：将文本缓冲区内容显示为游戏内消息，并清空文本缓冲区。这是特权指令，需要世界处理器。
+编辑器：[p1] for [p2] sec success [p3]
+文本：message [p1] [p2] [p3]
+用法：
+- [p1]：消息类型（可选值：announce（在屏幕中央呈现内容）、toast（在屏幕上方呈现内容）、notify（从上方弹出一个提示框呈现内容，提示框出现时间约3秒）、mission（在左上角状态栏呈现内容，内容实时更新，状态栏不会自动还原，需要打印一个空的内容来还原，注意不是空格））
+- [p2]：消息显示时间（秒，仅当p1为announce或toast时有效）
+- [p3]：存储操作结果的变量名，成功呈现内容即为成功。（number类型，1=成功，0=失败）
+示例：message announce 5 result
+解释：将文本缓冲区内容显示为公告消息，持续5秒，操作结果存入result变量
+提示：若当前执行的指令和上个消息类型相同，且上次未执行完毕则会进行等待。举个例子：
+set a 0 #设置变量a的值为0
+print "frog" 
+message announce 3 @wait #使用announce消息类型呈现3秒文本内容
+print "frog" #再次添加文本“frog”到文本缓冲区
+message announce 3 @wait #此时上一个同消息类型的文本还没有呈现完毕，待呈现完毕后才会执行后面的程序
+set a 1000 #逻辑代码总用时约3秒将变量a的值从0修改为了1000
+stop
+
+38.Cutscene（输出：无）
+作用：控制游戏摄像机，实现过场动画效果。这是特权指令，需要世界处理器。
+编辑器：[p1] x [p2] y [p3] speed [p4]
+文本：cutscene [p1] [p2] [p3] [p4]
+用法：
+- [p1]：操作类型（可选值：pan（移动）、zoom（缩放）、stop（停止对玩家的摄像机控制））
+- [p2]：目标x坐标（仅当p1为pan时有效）
+- [p3]：目标y坐标（仅当p1为pan时有效）
+- [p4]：speed（仅当p1为pan时有效）或缩放级别（仅当p1为zoom时有效，1为最小，0.1为最大）
+  speed是一个0~1的平滑系数（lerp fraction），表示每帧移动剩余距离的比例，而非固定速度（不是每秒移动多少格）。
+  值越大移动越快：1表示瞬间到达，0.5表示每帧移动一半剩余距离，0.01表示极慢过渡。编辑器中默认值为0.06。
+示例1：cutscene pan 100 200 0.5
+解释：让摄像机以0.5的平滑系数移动到(100,200)位置
+示例2：cutscene zoom 0.1
+解释：将摄像机缩放级别设置为0.1（扩大视野）
+
+39.Effect（输出：无）
+作用：在指定位置生成特效。这是特权指令，需要世界处理器。
+编辑器：[p1] x [p2] y [p3] [附加参数]
+文本：effect [p1] [p2] [p3] [p4] [p5] [p6]
+用法：
+- [p1]：特效类型，UI下拉菜单中可选的全部33种特效如下（按UI顺序排列）：
+  warn —— 警告标记（支持size、color、旋转）
+  cross —— 十字标记（支持size、color、旋转）
+  blockFall —— 方块坠落特效（支持size、color、旋转；data可填建筑类型content变量，如@conveyor）
+  placeBlock —— 放置方块特效（支持size、color、旋转）
+  placeBlockSpark —— 放置方块火花特效（支持size、color、旋转）
+  breakBlock —— 破坏方块特效（支持size、color、旋转）
+  spawn —— 生成特效（支持size、color、旋转）
+  trail —— 尾迹特效（支持size、color、旋转）
+  breakProp —— 破坏道具特效（支持size、color、旋转）
+  smokeCloud —— 烟雾云特效（支持size、color、旋转）
+  vapor —— 蒸汽特效（支持size、color、旋转）
+  hit —— 命中特效（支持size、color、旋转）
+  hitSquare —— 方形命中特效（支持size、color、旋转）
+  shootSmall —— 小型射击特效（支持size、color、旋转）
+  shootBig —— 大型射击特效（支持size、color、旋转）
+  smokeSmall —— 小型烟雾特效（支持size、color、旋转）
+  smokeBig —— 大型烟雾特效（支持size、color、旋转）
+  smokeColor —— 彩色烟雾特效（支持size、color、旋转）
+  smokeSquare —— 方形烟雾特效（支持size、color、旋转）
+  smokeSquareBig —— 大型方形烟雾特效（支持size、color、旋转）
+  spark —— 火花特效（支持size、color、旋转）
+  sparkBig —— 大型火花特效（支持size、color、旋转）
+  sparkShoot —— 火花射击特效（支持size、color、旋转）
+  sparkShootBig —— 大型火花射击特效（支持size、color、旋转）
+  drill —— 钻头特效（支持size、color、旋转）
+  drillBig —— 大型钻头特效（支持size、color、旋转）
+  lightBlock —— 光块特效（支持size、color、旋转）
+  explosion —— 爆炸特效（支持size、color、旋转）
+  smokePuff —— 烟团特效（支持size、color、旋转）
+  sparkExplosion —— 火花爆炸特效（支持size、color、旋转）
+  crossExplosion —— 十字爆炸特效（支持size、color、旋转）
+  wave —— 波纹特效（支持size、color）
+  bubble —— 气泡特效（支持size、color）
+- [p2]：特效位置x坐标
+- [p3]：特效位置y坐标
+- [p4]：特效大小或旋转角度（根据特效类型而定）
+- [p5]：特效颜色（16进制颜色代码，如%ff0000）
+- [p6]：额外数据（仅blockFall时可填写建筑类型content变量，如@conveyor；其他特效忽略）
+示例：effect warn 100 200 2 %ff0000 ""
+解释：在(100,200)位置生成大小为2的红色警告特效
+
+40.Explosion（输出：无）
+作用：在指定位置生成爆炸，对范围内的单位和建筑造成伤害。这是特权指令，需要世界处理器。
+编辑器：team [p1] x [p2] y [p3] radius [p4] damage [p5] air [p6] ground [p7] pierce [p8] effect [p9]
+文本：explosion [p1] [p2] [p3] [p4] [p5] [p6] [p7] [p8] [p9]
+用法：
+- [p1]：爆炸所属队伍（如@sharded、@derelict）
+- [p2]：爆炸位置x坐标
+- [p3]：爆炸位置y坐标
+- [p4]：爆炸半径（地图格子单位，最大100）
+- [p5]：爆炸伤害值
+- [p6]：是否对空军单位造成伤害（1=是，0=否）
+- [p7]：是否对地面单位造成伤害（1=是，0=否）
+- [p8]：是否取消伤害衰减，若取消，则伤害会作用在规定范围内的所有元素上，而不会根据元素位置进行伤害衰减（1=是，0=否）
+- [p9]：是否显示爆炸特效（1=是，0=否）
+示例：explosion @sharded 100 200 5 100 1 1 0 1
+解释：在(100,200)位置生成半径为5的爆炸，对空对地单位造成100点伤害，不穿透单位，显示爆炸特效
+
+41.Set Rate（输出：无）
+作用：修改处理器的执行速度（ipt，每秒执行的指令数）。这是特权指令，需要世界处理器。
+编辑器：ipt = [p1]
+文本：setrate [p1]
+用法：
+- [p1]：新的ipt值（数字字面量或变量，范围1~处理器最大ipt）
+示例：setrate 100
+解释：将处理器的ipt设置为100，即每秒执行100条指令
+
+42.Fetch（输出：unit/building/player/number）
+作用：获取指定队伍的单位、建筑、玩家或数量信息。这是特权指令，需要世界处理器。
+编辑器（条件显示，根据类型不同，部分参数会隐藏）：
+  结果变量 = [类型] team [队伍]
+  （当类型为非Count时，额外显示） # [索引]
+  （当类型含unit时，额外显示） unit [过滤类型]
+  （当类型含build时，额外显示） block [过滤类型]
+文本：fetch [p1] [p2] [p3] [p4] [p5]
+用法：
+- [p1]：获取类型（可选值：unit、player、core、build、unitCount、coreCount、playerCount、buildCount）
+- [p2]：存储结果的变量名
+- [p3]：队伍（如@sharded、@derelict；注意：仅支持队伍字面量，不支持变量）
+- [p4]：索引（仅当p1为unit、player、core、build时有效，从0开始）
+- [p5]：过滤类型（仅当p1含unit时为unit类型content变量，含build时为block类型content变量；其他类型时忽略）
+示例1：fetch unit myUnit @sharded 0 @poly
+解释：获取sharded队伍中索引为0的poly类型单位，结果存入myUnit变量
+示例2：fetch unitCount unitCount @sharded 0 @dagger
+解释：获取sharded队伍中dagger类型单位的数量，结果存入unitCount变量
+
+43.Sync（输出：无）
+作用：同步指定变量到所有客户端，确保所有玩家看到相同的变量值。每秒最多调用10次。这是特权指令，需要世界处理器。
+编辑器：[p1]
+文本：sync [p1]
+用法：
+- [p1]：需要同步的变量名
+示例：sync score
+解释：将score变量同步到所有客户端
+
+44.Get Flag（输出：number）
+作用：获取指定全局标志的状态。这是特权指令，需要世界处理器。
+编辑器：[p1] = flag [p2]
+文本：getflag [p1] [p2]
+用法：
+- [p1]：存储结果的变量名（number类型，1=已设置，0=未设置）
+- [p2]：标志名称（字符串字面量，如"objective1"）
+示例：getflag objective1Completed "objective1"
+解释：获取"objective1"标志的状态，结果存入objective1Completed变量
+
+45.Set Flag（输出：无）
+作用：设置或清除指定全局标志。这是特权指令，需要世界处理器。
+编辑器：[p1] = [p2]
+文本：setflag [p1] [p2]
+用法：
+- [p1]：标志名称（字符串字面量，如"objective1"）
+- [p2]：标志状态（1=设置，0=清除）
+示例1：setflag "objective1" 1
+解释：设置"objective1"标志
+示例2：setflag "objective1" 0
+解释：清除"objective1"标志
+
+46.Set Prop（输出：无）
+作用：修改建筑或单位的属性。这是特权指令，需要世界处理器。
+编辑器：set [p1] of [p2] to [p3]
+文本：setprop [p1] [p2] [p3]
+用法：
+- [p1]：属性类型（可选值：@x、@y、@velocityX、@velocityY、@rotation、@speed、@armor、@health、@shield、@team、@flag、@totalPower、@payloadType、@bulletTime、@bulletLifetime）
+- [p2]：目标对象（building或unit类型变量）
+- [p3]：新的属性值（对于@x、@y直接设置坐标，无法修改处理器自身的坐标；对于@velocityX、@velocityY设置速度分量；对于@rotation设置旋转角度；对于@speed设置速度；对于@armor设置护甲；对于@health设置生命值；对于@shield设置护盾值；对于@team设置为队伍类型；对于@flag设置标记；对于@totalPower设置总电量；对于@payloadType设置载荷类型；对于@bulletTime设置子弹时间；对于@bulletLifetime设置子弹生命值）
+示例：setprop @health myTurret 1000
+解释：将myTurret炮塔的生命值设置为1000
+
+47.Play Sound（输出：无）
+作用：播放指定音效。这是特权指令，需要世界处理器。
+编辑器：[p1] [p2] volume [p3] pitch [p4] pan [p5] x [p6] y [p7] limit [p8]
+文本：playsound [p1] [p2] [p3] [p4] [p5] [p6] [p7] [p8]
+用法：
+- [p1]：音效类型（positional= 在指定坐标播放音效，会根据玩家的视角xy坐标进行音量衰减；global=全局音效）
+- [p2]：音效ID，以下为全部可选的205种音效（使用时格式为 @sfx-音效名，如@sfx-shootDuo，按UI下拉菜单字母序排列）：
+  建筑/方块音效（37种）：
+    acceleratorCharge, acceleratorConstruct, acceleratorLaunch, acceleratorLightning1, acceleratorLightning2,
+    blockBreak1, blockBreak2, blockBreak3, blockHeal, blockPlace1, blockPlace2, blockPlace3,
+    blockRepair, blockRotate, click, coreLand, coreLaunch, door,
+    drillCharge, drillImpact, healWave, massdriver, massdriverReceive,
+    padLand, padLaunch, payloadDrop1, payloadDrop2, payloadDrop3, payloadPickup,
+    plantBreak, rockBreak, shieldBreak, shieldBreakSmall, shieldHit, shieldWave,
+    shockwaveTower, unitCreate, unitCreateBig
+  爆炸音效（33种）：
+    blockExplode1, blockExplode1Alt, blockExplode2, blockExplode2Alt, blockExplode3,
+    blockExplodeElectric, blockExplodeElectricBig, blockExplodeExplosive, blockExplodeExplosiveAlt,
+    blockExplodeFlammable, blockExplodeWall,
+    explosion, explosionAfflict, explosionArtillery, explosionArtilleryShock, explosionArtilleryShockBig,
+    explosionCleroi, explosionCore, explosionCrawler, explosionDull, explosionMissile,
+    explosionNavanax, explosionObviate, explosionPlasmaSmall, explosionQuad,
+    explosionReactor, explosionReactor2, explosionReactorNeoplasm, explosionTitan,
+    shockBullet, unitExplode1, unitExplode2, unitExplode3
+  射击音效（64种）：
+    shoot, shootAfflict, shootAlpha, shootArc, shootArtillery, shootArtillerySap, shootArtillerySapBig,
+    shootArtillerySmall, shootAtrax, shootAvert, shootBeamPlasma, shootBeamPlasmaSmall,
+    shootBreach, shootBreachCarbide, shootCleroi, shootCollaris, shootConquer, shootCorvus,
+    shootCyclone, shootDiffuse, shootDisperse, shootDuo, shootEclipse, shootElude,
+    shootEnergyField, shootFlame, shootFlamePlasma, shootForeshadow, shootFuse,
+    shootHorizon, shootLancer, shootLaser, shootLocus, shootMalign, shootMeltdown,
+    shootMerui, shootMissile, shootMissileLarge, shootMissileLong, shootMissilePlasma,
+    shootMissilePlasmaShort, shootMissileShort, shootMissileSmall,
+    shootNavanax, shootOmura, shootPayload, shootPulsar, shootQuad,
+    shootReign, shootRetusa, shootRipple, shootSalvo, shootSap,
+    shootScathe, shootScatter, shootScepter, shootScepterSecondary, shootSegment,
+    shootSmite, shootSpectre, shootStell, shootSublimate, shootTank, shootToxopidShotgun
+  循环/持续音效（35种）：
+    loopBio, loopBuild, loopCircuit, loopCombustion, loopConveyor, loopCultivator,
+    loopCutter, loopDifferential, loopDrill, loopElectricHum, loopExtract, loopFire,
+    loopFlux, loopGlow, loopGrind, loopHover, loopHover2, loopHum,
+    loopMachine, loopMachine2, loopMachineSpin, loopMalign, loopMineBeam,
+    loopMissileTrail, loopPulse, loopRegen, loopShield, loopSmelter,
+    loopSpray, loopSteam, loopTech, loopThoriumReactor, loopThruster, loopUnitBuilding
+  光束音效（6种）：
+    beamHeal, beamLustre, beamMeltdown, beamParallax, beamPlasma, beamPlasmaSmall
+  充能音效（3种）：
+    chargeCorvus, chargeLancer, chargeVela
+  单位移动音效（13种）：
+    mechStep, mechStepHeavy, mechStepSmall, shipMove, shipMoveBig,
+    stepMud, stepWater, tankMove, tankMoveHeavy, tankMoveSmall,
+    walkerStep, walkerStepSmall, walkerStepTiny
+  环境音效（5种）：
+    rain, wind, wind2, wind3, windHowl
+  界面音效（6种）：
+    uiBack, uiButton, uiChat, uiFavorite, uiNotify, uiUnlock
+  其他音效（3种）：
+    waveSpawn, wreckFall, wreckFallBig
+- [p3]：音量（0~2）
+- [p4]：音调（0.5~2）
+- [p5]：声道平衡（-1~1，仅当p1为global时有效）
+- [p6]：音效位置x坐标（仅当p1为positional时有效）
+- [p7]：音效位置y坐标（仅当p1为positional时有效）
+- [p8]：是否限制音效在同一帧内重复播放（1=是，0=否）
+示例1：playsound positional @sfx-shootDuo 1 1 0 100 200 1
+解释：在(100,200)位置播放shootDuo音效，音量1，音调1，限制播放频率
+示例2：playsound global @sfx-explosion 1 1 0 0 0 1
+解释：全局播放explosion音效，音量1，音调1，声道平衡0，限制播放频率
+
+48.Set Marker（输出：无）
+作用：修改已存在的地图标记属性。这是特权指令，需要世界处理器。
+编辑器：set [p1] of id# [p2] [动态参数]
+文本：setmarker [p1] [p2] [p3] [p4] [p5]
+用法：
+- [p1]：修改类型，UI下拉菜单中可选的全部25种如下（按UI顺序排列）：
+  remove —— 移除标记（无需额外参数）
+  world —— 设置是否世界坐标（p3=true/false）
+  minimap —— 设置是否在小地图显示（p3=true/false）
+  autoscale —— 设置是否自动缩放（p3=true/false）
+  pos —— 设置标记位置（p3=x, p4=y）
+  endPos —— 设置终点位置（用于线段标记，p3=x, p4=y）
+  drawLayer —— 设置绘制图层（p3=图层数值）
+  color —— 设置标记颜色（p3=16进制颜色代码，如%ff0000）
+  radius —— 设置半径（p3=半径值）
+  stroke —— 设置描边粗细（p3=粗细值）
+  outline —— 设置轮廓（p3=true/false）
+  rotation —— 设置旋转（p3=角度）
+  shape —— 设置形状（p3=边数, p4=填充, p5=描边）
+  arc —— 设置弧形（p3=起始角度, p4=结束角度）
+  flushText —— 刷新文本缓冲区到标记（p3=是否从本地化包获取）
+  fontSize —— 设置字体大小（p3=大小值）
+  textHeight —— 设置文本高度（p3=高度值）
+  textAlign —— 设置文本对齐（p3=对齐方式，如@center、@left等）
+  lineAlign —— 设置线段对齐（p3=对齐方式，如@center、@left等）
+  labelFlags —— 设置标签标志（p3=背景, p4=描边）
+  texture —— 设置纹理（p3=纹理名称，或p3=true时从文本缓冲区读取纹理名称）
+  textureSize —— 设置纹理大小（p3=宽度, p4=高度）
+  posi —— 按索引设置位置（用于折线和四边形，p3=索引, p4=x, p5=y）
+  uvi —— 按索引设置UV坐标（用于四边形标记，p3=索引, p4=u, p5=v）
+  colori —— 按索引设置颜色（用于折线和四边形，p3=索引, p4=颜色）
+- [p2]：标记ID（数字字面量）
+- [p3-p5]：根据修改类型不同，参数数量和含义不同
+示例1：setmarker pos 0 100 200 0
+解释：将ID为0的标记位置设置为(100,200)
+示例2：setmarker color 0 %ff0000 0 0
+解释：将ID为0的标记颜色设置为红色
+
+49.Make Marker（输出：无）
+作用：创建新的地图标记。这是特权指令，需要世界处理器。
+编辑器：[p1] id [p2] x [p3] y [p4] replace [p5]
+文本：makemarker [p1] [p2] [p3] [p4] [p5]
+用法：
+- [p1]：标记类型（可选值：shapeText（带文本的形状）、point（点）、shape（形状）、text（文本）、line（线段）、texture（纹理/图像）、quad（四边形））
+- [p2]：标记ID（数字字面量）
+- [p3]：标记位置x坐标
+- [p4]：标记位置y坐标
+- [p5]：是否替换已存在的标记（1=是，0=否）
+示例：makemarker shape 0 100 200 1
+解释：在(100,200)位置创建ID为0的形状标记，如果已存在则替换
+
+50.Local Print（输出：无）
+作用：将本地化文本添加到文本缓冲区。这是特权指令，需要世界处理器。
+编辑器：[p1]
+文本：localeprint [p1]
+用法：
+- [p1]：本地化文本键（字符串字面量，如"core.destroyed"）
+示例：localeprint "core.destroyed"
+解释：将"core.destroyed"对应的本地化文本添加到文本缓冲区
+
++ 51.ClientData（输出：无）
+作用：向所有客户端的指定频道广播自定义数据。这是 Mod API，在纯原版游戏中没有实际用途。
+      频道（channel）是一个纯字符串标签，类似广播的"主题名"，发送方和接收方通过相同的频道名匹配。
+      ● 发送方：世界处理器执行 clientdata，服务端将数据广播给所有客户端
+      ● 接收方：必须通过 Mod 注册处理器（netServer.addLogicDataHandler("频道名", handler)），
+        原版处理器无法接收此数据——没有对应的"读取网络数据"逻辑指令
+      ● 如果没有 Mod 注册对应频道的处理器，数据会被广播但无人接收，等于没有任何效果
+      这是特权指令，需要世界处理器。此指令在游戏内UI中隐藏，需手动输入。
+     ⚠ 前置条件：此指令受 `allowLogicData` 规则控制（Rules.java 第230行，默认 false）。
+       该规则未在自定义规则 UI 中显示，必须通过以下方式启用：
+       ● 服务端控制台：执行 `rules.allowLogicData=true`
+       ● 规则导出/导入：在自定义规则对话框中点"复制(Copy)"，将 JSON 粘贴到文本编辑器，
+         添加 `"allowLogicData": true`，再点"加载(Load)"导入
+       ● Mod：通过 Mod 直接设置 `state.rules.allowLogicData = true`
+       若未启用此规则，ClientData 指令在编译阶段会返回 null，不执行任何操作。
+编辑器：send [p1] on [p2], reliable [p3]
+文本：clientdata [p1] [p2] [p3]
+　　　注意：文本格式与编辑器顺序不同——编辑器中 data 在前、channel 在后，但文本格式中 channel 在前、data 在后。
+用法：
+- [p1]：频道名称（字符串字面量，任意字符串，发送方和接收方通过相同的频道名匹配）
+- [p2]：要发送的数据（可为number、string、content等任意类型）
+- [p3]：是否可靠传输（1=可靠传输，0=不可靠传输；可靠传输通过TCP保证送达但延迟略高）
+示例：clientdata "chat" "Hello" 1
+解释：通过"chat"频道可靠广播字符串"Hello"给所有客户端
