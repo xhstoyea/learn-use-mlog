@@ -10,7 +10,7 @@ learn mindustry logic（A4 Tacks的逻辑教程） - https://github.com/A4-Tacks
 A4 Tacks的逻辑编译器 - https://github.com/A4-Tacks/mindustry_logic_bang_lang
 A4 Tacks的逻辑编译器学习引导 - https://github.com/A4-Tacks/mindustry_logic_bang_lang/blob/main/examples/README.md
 
-附录：游戏内容.md
+附录：https://github.com/xhstoyea/learn-use-mlog/blob/main/%E6%B8%B8%E6%88%8F%E5%86%85%E5%AE%B9.md
 
 若你发现任何问题，欢迎加入QQ群并@我，QQ群号：1034687528。当然，你也可以选择直接向我的QQ发送消息，QQ号：3758268235，邮箱也可以：3758268235@qq.com。我们欢迎您为这份指南做贡献！
 
