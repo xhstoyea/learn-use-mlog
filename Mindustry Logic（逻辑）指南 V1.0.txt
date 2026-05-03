@@ -1,4 +1,5 @@
 Mindustry Logic（逻辑）指南 V1.0
+项目地址：https://github.com/xhstoyea/learn-use-mlog
 
 作者：西红柿汤
 
