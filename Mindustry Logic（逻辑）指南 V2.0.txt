@@ -130,7 +130,7 @@ Logic，中文名逻辑，使用游戏作者（Anuke）自创的mlog语言，是
 -- 6.时间条机制：
 1.时间条：逻辑控制建筑/单位时，会触发时间条，期间对象原AI停用，完全由逻辑控制；可用Control、Unit Control、Unit Rader、Unit Locate指令重置时间条，耗尽后对象恢复原AI。
 2.时间条长度：
-- 单位控制：时间条长度600tick（即10秒），且部分Unit Control指令存在90tick（即1.5秒）的隐形计时器用于防止高频操作，单位必须等待90tick才能继续此操作，隐形计时器作用于Unit Control-payDorp、Unit Control-payTake、Unit Control-itmeDrop、Unit Control-itmeTake指令。
+- 单位控制：时间条长度600tick（即10秒），且部分Unit Control指令存在90tick（即1.5秒）的隐形计时器用于防止高频操作，单位必须等待90tick才能继续此操作，隐形计时器作用于Unit Control-payDrop、Unit Control-payTake、Unit Control-itemDrop、Unit Control-itemTake指令。
 - 建筑控制：建筑没有像单位那样的时间条，而是采用永久锁定机制：
 每次执行 Control 指令立即生效（如 enabled、shoot 等）；
 对 enabled=false 的禁用效果：除非你重新执行 Control enabled=true 指令、或者取消建筑与处理器的链接、或者拆除处理器，否则建筑会永久保持禁用（没有"时间耗尽"自动解锁）；
@@ -522,8 +522,8 @@ Sensor支持的参数表：
 - rotation：旋转角度（输出：number）；规则：对于传送带、载荷路由器：(!1-2)；对于单位/炮塔：(!1-1)
 - x：对象在地图中的x坐标（输出：number）
 - y：对象在地图中的y坐标（输出：number）
-- velocityX：单位在x轴方向的运动速度（正负表方向，大小表速度，输出：number）
-- velocityY：单位在y轴方向的运动速度（正负表方向，大小表速度，输出：number）
+- velocityX：单位在x轴方向的运动速度（正负表方向，大小表速度，单位：格/秒，输出：number）
+- velocityY：单位在y轴方向的运动速度（正负表方向，大小表速度，单位：格/秒，输出：number）
 - shootX：对象射击点的x坐标（输出：number）
 - shootY：对象射击点的y坐标（输出：number）
 - cameraX：玩家的视角中心点x坐标（输出：number）
@@ -534,37 +534,38 @@ Sensor支持的参数表：
 - displayHeight：显示屏的像素格高度（输出：number）
 - bufferSize：信息板/字符串的文本长度。在显示屏中，表示未处理的缓冲区指令数。区分：字符串变量自身长度请用@size。（输出：number）
 - operations：DrawFlush指令执行的累计次数。每次执行DrawFlush时计数器加1，无刷新间隔，即时更新。仅适用于LogicDisplay（逻辑显示屏、大型逻辑显示屏、逻辑显示单元）方块。（输出：number）
-- size：对象的尺寸（建筑尺寸如2=2*2，字符串变量为长度。注意区分：字符串用@size，信息板用@bufferSize）（输出：number）
+- size：对象的尺寸。建筑返回占格数（如2=2*2），单位返回碰撞半径（地图格子单位），字符串变量返回长度。注意区分：字符串用@size，信息板用@bufferSize（输出：number）
 - solid：建筑是否实心（如门关闭时为1，输出：number）
 - dead：对象是否已失效（输出：number）。注意：建筑也有效。
-- range：对象的雷达范围。建筑即使没有可见圆圈，通常也有较小的范围值。（输出：number）
+- range：对象的范围（地图格子单位）。对建筑：仅实现范围接口的建筑返回其范围值（如炮塔的射击范围、修复塔的修复范围、力场投影器的护盾半径、处理器的链接范围等），否则返回0；对单位：返回最大范围（通常为最远武器射程，若无攻击武器则为采矿范围）（输出：number）
 - shooting：对象是否正在射击（输出：number）
 - boosting：陆军单位是否开启助推（输出：number）
-- mineX：单位采矿点的x坐标（输出：number）
-- mineY：单位采矿点的y坐标（输出：number）
+- mineX：单位采矿点的x坐标（未采矿时为-1，输出：number）
+- mineY：单位采矿点的y坐标（未采矿时为-1，输出：number）
 - mining：单位是否正在采矿（输出：number）
-- buildX：单位建造点的x坐标（输出：number）
-- buildY：单位建造点的y坐标（输出：number）
-- pingX：单位标记点的x坐标（输出：number）
-- pingY：单位标记点的y坐标（输出：number）
-- pingText：单位标记点的文本内容（输出：string）
-- building：单位是否正在建筑内（如进入载荷方块时，返回所在的建筑，否则返回null，输出：building）
-- breaking：单位是否正在拆除方块（输出：number）
-- speed：单位当前的移动速度（输出：number）
+- buildX：单位建造点的x坐标（未建造时为-1，输出：number）
+- buildY：单位建造点的y坐标（未建造时为-1，输出：number）
+- pingX：玩家标记点的x坐标（仅当单位被玩家控制且玩家正在标记时有效，否则返回NaN，输出：number）
+- pingY：玩家标记点的y坐标（仅当单位被玩家控制且玩家正在标记时有效，否则返回NaN，输出：number）
+- pingText：玩家标记点的文本内容（仅当单位被玩家控制且玩家正在标记时有效，输出：string）
+- building：单位当前建造计划目标位置的建筑（若单位正在建造且不是拆除，返回目标位置的建筑，否则返回null，输出：building）
+- breaking：单位当前拆除计划目标位置的建筑（若单位正在拆除，返回目标位置的建筑，否则返回null，输出：building）
+- speed：单位当前的移动速度（单位：格/秒，输出：number）
 - team：所属队伍（输出：team）
 - type：目标类型（如路由器返回@router，输出：content）。也可对unit使用，获取单位的content类型。
+- config：建筑的当前配置（如物品源选中的物品、单位工厂选中的单位类型，仅对可配置且配置可读取的建筑有效，输出：content）
 - flag：单位标记（输出：number）
 - controlled：单位/建筑的控制状态（1=单位被处理器控制（对应@ctrlProcessor），2=单位/建筑被玩家附身（对应@ctrlPlayer），3=单位在指挥编队中（对应@ctrlCommand），0=其他情况，输出：number）
-- controller：控制者（若单位被处理器控制则返回对应的处理器，在编队中返回领队，其他情况返回自身，输出：building/unit）
-- name：对象的玩家名字（输出：string）
+- controller：控制者（若单位被处理器控制则返回对应的处理器，其他情况返回自身，输出：building/unit）
+- name：对象的名称。对被玩家控制的单位返回玩家名字，对content类型（物品、液体等）返回内部名称，对建筑返回null（输出：string）
 - payloadCount：对象携带的载荷数量（输出：number）
 - payloadType：对象携带的第一个载荷的类型，按ID从小到大排序（输出：content）
 - totalPayload：对象已用的载荷容量（输出：number）
 - payloadCapacity：对象的载荷容量（输出：number）
 - maxUnits：队伍的最大单位数量（只能从核心上获取，输出：number）
-- id：对象的ID（输出：number）
-- selectedBlock：单位工厂当前选中的建筑类型（如单位工厂的建造项，输出：content）
-- selectedRotation：单位工厂当前选中的旋转角度（输出：number）
+- id：对象的逻辑ID。仅对物品和液体有效，返回Lookup指令中使用的ID；对建筑和单位返回null（输出：number）
+- selectedBlock：玩家当前选中的建筑类型（仅当单位被玩家控制时有效，输出：content）
+- selectedRotation：玩家当前选中的建筑旋转角度（仅当单位被玩家控制时有效，输出：number）
 - bulletLifetime：子弹剩余生命值（输出：number）
 - bulletTime：子弹存在时间（输出：number）
 
@@ -772,23 +773,25 @@ print "yes"
   - p2：目标单位或建筑
   - p3：是否射击（提示：目标在单位的雷达范围内才会射击，否则只会瞄准，而且这个瞄准还不管距离，哪怕和目标相距1000多格都能瞄准。或许可以用来做雷达？）
   10.itemDrop：放下携带的物品
-  - p2：目标建筑（可使用@air直接丢弃物品）
+  - p2：目标建筑（必须与单位同队伍，且建筑允许存入物品；可使用@air直接丢弃物品）
   - p3：物品数量
+  注意：单位与目标建筑的距离不能超过5.625+目标建筑尺寸×0.5格（例如对尺寸为2的建筑，最大距离为6.625格）；建筑默认允许存入物品，但若游戏规则启用了"仅允许存入核心"，则只有核心和已链接核心的仓储建筑允许存入
   11.itemTake：从指定建筑拾取物品
-  - p2：目标建筑
+  - p2：目标建筑（必须与单位同队伍，且建筑必须有物品栏）
   - p3：物品类型
   - p4：物品数量
+  注意：单位与目标建筑的距离不能超过5.625+目标建筑尺寸×0.5格（例如对尺寸为2的建筑，最大距离为6.625格）；逻辑指令不受建筑"是否输出物品"限制，即使炮塔等手动无法取出物品的建筑，逻辑指令也可以从中拿取物品
   12.payDrop：放下携带的载荷
   - 无额外参数
   13.payTake：拾取附近的载荷
-  - p2：是否拾取单位
-  14.payEnter：进入指定建筑
+  - p2：是否拾取单位（拾取单位时搜索范围为碰撞半径×2；拾取建筑载荷时，单位必须站在目标建筑上方）
+  14.payEnter：进入指定建筑（单位必须站在目标建筑上方才能进入）
   - 无额外参数
   15.mine：在指定坐标采矿
   - p2：采矿点x坐标
   - p3：采矿点y坐标
   16.flag：设置单位标记
-  - p2：标记值（只能为数字，可以是负数，不能是浮点数，若是浮点数则取整数，若值不是数字，比如content类型变量，则其值不为null、0、false时其值均取1）
+  - p2：标记值（可为任意数字，包括负数和浮点数；若值不是数字，比如content类型变量，则其值不为null、0、false时其值均取1）
   17.build：建造指定建筑
   - p2：目标x坐标
   - p3：目标y坐标
@@ -798,7 +801,7 @@ print "yes"
   18.deconstruct：拆除指定位置的建筑（需要规则中启用单位拆除建筑，在自定义规则中默认关闭）
   - p2：目标x坐标
   - p3：目标y坐标
-  19.getBlock：获取指定位置的地块信息（不在单位雷达范围内无法获取）
+  19.getBlock：获取指定位置的地块信息（目标位置需在单位的最大范围与建造范围中较大者的范围内，否则无法获取）
   - p2：目标x坐标
   - p3：目标y坐标
   - p4：存储块的content类型变量，若无块则为@air
@@ -1378,4 +1381,3 @@ stop
 - [p3]：是否可靠传输（1=可靠传输，0=不可靠传输；可靠传输通过TCP保证送达但延迟略高）
 示例：clientdata "chat" "Hello" 1
 解释：通过"chat"频道可靠广播字符串"Hello"给所有客户端
-
