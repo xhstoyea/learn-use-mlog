@@ -77,7 +77,7 @@ Logic，中文名逻辑，使用游戏作者（Anuke）自创的mlog语言，是
 - 世界处理器：无权限限制，可操作所有建筑（含其他队伍建筑），可直接链接跨队伍建筑。
 
 3.建筑获取方式：
-- 除链接外，还可通过其他指令（UnitControl的子指令getblock；Rader）获取目标建筑或单位，无需依赖直接链接。
+- 除链接外，还可通过其他指令（UnitControl的子指令getBlock；Radar）获取目标建筑或单位，无需依赖直接链接。
 
 四、逻辑的编写
 1.编辑界面操作：
@@ -95,7 +95,7 @@ Logic，中文名逻辑，使用游戏作者（Anuke）自创的mlog语言，是
 3.编写方式及事项：
 - 方式一：游戏内编辑，通过点击“添加”按钮添加代码块，在编辑器中选择指令并设置参数。
 - 方式二：游戏外编写，用文本编辑器直接写代码，完成后粘贴到游戏编辑器中；文本编写支持用“#”添加注释（#后的整行内容会被忽略，注释不会显示在编辑器中，想要在编辑器内添加注释最好的选择就是用Print指令）。
-- 占位符说明：导出编辑器代码时，可能出现多余占位符（如“draw scale x y 0 0 0 0”），文本编写时可忽略这些占位符（仅需保留有效参数，占位符可填任意值）。对于draw rotate等指令，文本格式中包含多个参数，但实际只使用部分参数，其余填任意值即可。
+- 占位符说明：编辑器中的代码块参数数量固定，导出编辑器代码时可能出现多余占位参数（如"draw scale x y 0 0 0 0"），文本编写时仅需保留有效参数，占位参数可填任意值。不同指令的占位参数数量不同，具体在各指令说明中标注。
 - 子指令：主指令中有很多子指令，在此指南中，我将在需要提及某个具体指令时使用-来表示主指令的子指令，例如Draw指令中的print指令用Draw-print指令表示。
 
 4.特性及各指令的注意事项：
@@ -128,7 +128,7 @@ Logic，中文名逻辑，使用游戏作者（Anuke）自创的mlog语言，是
 2.手动取消链接的影响：手动取消某建筑的链接后，该建筑的索引会被分配到当前链接列表的末尾；例如：取消双管炮（原索引0）链接，铜墙索引变为0；重新链接双管炮后，双管炮索引变为1。
 
 -- 6.时间条机制：
-1.时间条：逻辑控制建筑/单位时，会触发时间条，期间对象原AI停用，完全由逻辑控制；可用Control、Unit Control、Unit Rader、Unit Locate指令重置时间条，耗尽后对象恢复原AI。
+1.时间条：逻辑控制建筑/单位时，会触发时间条，期间对象原AI停用，完全由逻辑控制；可用Control、Unit Control、Unit Radar、Unit Locate指令重置时间条，耗尽后对象恢复原AI。
 2.时间条长度：
 - 单位控制：时间条长度600tick（即10秒），且部分Unit Control指令存在90tick（即1.5秒）的隐形计时器用于防止高频操作，单位必须等待90tick才能继续此操作，隐形计时器作用于Unit Control-payDrop、Unit Control-payTake、Unit Control-itemDrop、Unit Control-itemTake指令。
 - 建筑控制：建筑没有像单位那样的时间条，而是采用永久锁定机制：
@@ -142,7 +142,9 @@ Logic，中文名逻辑，使用游戏作者（Anuke）自创的mlog语言，是
 1.更新频率：输出结果：建筑Radar每30tick更新一次，单位Radar每40tick更新一次；如果你在更新间隔未结束前再次使用此指令也不会更新结果。
 2.特殊单位：埃里克尔的核心机无法被搜索到。
 
--- 8.对于Select、Jump，其条件判断符在编辑器中的可选值为==、not、<、<=、>、>=、===、always。对于文本编写，其所用名称与op指令相对应，例如==用文本编写就是equal。条件判断符的作用与op指令相同。
+-- 8.对于Select、Jump，其条件判断符在编辑器中的可选值为==、not、<、<=、>、>=、===、always。对于文本编写，其所用名称与ConditionOp枚举一致：equal（==）、notEqual（not）、lessThan（<）、lessThanEq（<=）、greaterThan（>）、greaterThanEq（>=）、strictEqual（===）、always。条件判断符的作用与op指令中对应的运算符相同，但strictEqual和always是条件判断专用的：
+  - strictEqual（===）：严格相等判断，不转换类型。数字仅与数字相等，字符串仅与字符串相等，content类型仅与相同content相等，null仅与null相等。与op指令的strictEqual不同，条件判断中的strictEqual会正确比较对象类型。
+  - always：始终为真，无论两个参数的值是什么。常用于无条件跳转（如jump 0 always 0 0）。
 
 -- 9.Sensor的@dead属性对建筑也有效，可判断建筑是否存在/有效。
 
@@ -179,6 +181,8 @@ Logic，中文名逻辑，使用游戏作者（Anuke）自创的mlog语言，是
 -- 25.Fetch指令的队伍参数支持数字变量（不只是字面量），例如可用sensor获取的team ID作为Fetch的队伍参数。
 
 -- 26.uradar文本格式参数顺序需特别注意：uradar [target1] [target2] [target3] [sort] 0 [sortOrder] [output]，其中第5个参数为占位参数填0。
+
+-- 27.Effect指令编辑器与文本格式参数顺序差异：编辑器中color在size/rotation之前显示，但文本格式中size/rotation（p4）在color（p5）之前。例如，在编辑器中lightBlock特效的参数显示顺序为type、x、y、color、size，但文本格式为effect lightBlock [x] [y] [size] [color] [data]。
 
 五、变量系统（含类型、内置变量）
 变量类型：
@@ -353,7 +357,7 @@ Logic，中文名逻辑，使用游戏作者（Anuke）自创的mlog语言，是
 
 ❺编辑器：rotate degrees[p1]
 文本：draw rotate [p1] [p2] [p3] [p4] [p5] [p6]
-用法：旋转绘图缓冲区内容；其中参数[p3]（文本格式中对应第4个参数，即p1的值）为旋转角度（角度制），其余参数（x、y、p2、p3、p4）填任意值即可；正数为逆时针旋转，负数为顺时针旋转；旋转以当前变换中心（由translate累积确定，默认为(0,0)即屏幕左下角）为轴心；rotate效果也是累积的
+用法：旋转绘图缓冲区内容；编辑器中仅需填写旋转角度，文本格式中需要6个参数，但只有第3个参数（p3）为旋转角度（角度制），其余5个参数（p1、p2、p4、p5、p6）填任意值即可（占位参数）；正数为逆时针旋转，负数为顺时针旋转；旋转以当前变换中心（由translate累积确定，默认为(0,0)即屏幕左下角）为轴心；rotate效果也是累积的
 示例：draw rotate 0 0 90 0 0 0 → 绘图缓冲区内容绕当前变换中心逆时针旋转90度
 
 ❻编辑器：reset
@@ -516,7 +520,7 @@ Sensor支持的参数表：
 - heat：热量（如钍反应堆的热量，输出：number）
 - shield：护盾值（输出：number）
 - armor：护甲值（输出：number）
-- efficiency：建筑的工作效率，值为0~1，1为满效，例如窑炉因电力不足而无法满效运行，这时值不为1。此值不受加成或环境影响，例如太阳能板即使在黑天完全不发电效率还是1（输出：number）
+- efficiency：建筑的工作效率，值为0~1，1为满效，例如窑炉因电力不足而无法满效运行，这时值不为1。此值主要受消耗品（电力、物品、液体等）的影响；少数建筑（如属性工厂、热力工厂）还会受到环境属性或热量等额外因素的影响。对于没有消耗品的建筑（如太阳能板），效率始终为1，即使其实际产出受其他因素影响（输出：number）
 - progress：建筑的工作进度（0~1，输出：number）
 - timescale：被超速器超速的倍率（输出：number）
 - rotation：旋转角度（输出：number）；规则：对于传送带、载荷路由器：(!1-2)；对于单位/炮塔：(!1-1)
@@ -553,7 +557,6 @@ Sensor支持的参数表：
 - speed：单位当前的移动速度（单位：格/秒，输出：number）
 - team：所属队伍（输出：team）
 - type：目标类型（如路由器返回@router，输出：content）。也可对unit使用，获取单位的content类型。
-- config：建筑的当前配置（如物品源选中的物品、单位工厂选中的单位类型，仅对可配置且配置可读取的建筑有效，输出：content）
 - flag：单位标记（输出：number）
 - controlled：单位/建筑的控制状态（1=单位被处理器控制（对应@ctrlProcessor），2=单位/建筑被玩家附身（对应@ctrlPlayer），3=单位在指挥编队中（对应@ctrlCommand），0=其他情况，输出：number）
 - controller：控制者（若单位被处理器控制则返回对应的处理器，其他情况返回自身，输出：building/unit）
@@ -563,11 +566,14 @@ Sensor支持的参数表：
 - totalPayload：对象已用的载荷容量（输出：number）
 - payloadCapacity：对象的载荷容量（输出：number）
 - maxUnits：队伍的最大单位数量（只能从核心上获取，输出：number）
-- id：对象的逻辑ID。仅对物品和液体有效，返回Lookup指令中使用的ID；对建筑和单位返回null（输出：number）
+- id：对象的逻辑ID。对物品和液体返回Lookup指令中使用的ID；对建筑和单位返回null（输出：number）
 - selectedBlock：玩家当前选中的建筑类型（仅当单位被玩家控制时有效，输出：content）
 - selectedRotation：玩家当前选中的建筑旋转角度（仅当单位被玩家控制时有效，输出：number）
 - bulletLifetime：子弹剩余生命值（输出：number）
 - bulletTime：子弹存在时间（输出：number）
+- enabled：建筑是否启用（1=启用，0=禁用，输出：number）
+- config：建筑的当前配置（如物品源选中的物品、单位工厂选中的单位类型，仅对可配置且配置可读取的建筑有效，输出：content）
+- color：对象的队伍颜色（返回打包后的颜色数值，输出：number）
 
 示例：sensor turretHealth turret1 @health → 获取turret1炮塔的当前生命值，存入turretHealth变量
 
@@ -659,12 +665,13 @@ atan / atan / 计算参数的反正切值（角度制，结果范围-90~90；非
 16.Lookup（输出：content、team）
 作用：根据ID查找游戏内容（物品、建筑、单位、流体、队伍），返回对应的content或team类型变量。注意：当查找类型为team时，返回值为team类型，这是五个类型中唯一的例外。
 编辑器：[p1] = lookup [p2] # [p3]
-文本：lookup [p1] [p2] [p3]
-用法：
-- [p1]：存储结果的变量名
-- [p2]：内容类型（可选值：block、unit、item、liquid、team）
-- [p3]：内容的ID
-示例：lookup result item 0
+文本：lookup [p2] [p1] [p3]
+　　　注意：文本格式与编辑器顺序不同——编辑器中 result 在前、type 在后，但文本格式中 type 在前、result 在后。
+用法（按文本格式顺序）：
+- 第1个参数：内容类型（可选值：block、unit、item、liquid、team）
+- 第2个参数：存储结果的变量名
+- 第3个参数：内容的ID
+示例：lookup item result 0
 解释：查找ID为0的物品，结果存入result变量
 
 17.Pack Color（输出：number）
@@ -724,11 +731,12 @@ atan / atan / 计算参数的反正切值（角度制，结果范围-90~90；非
 - [p4]：条件判断的第二个值（compare）
 示例：jump 0 equal count 10
 解释：如果count变量的值等于10，跳转到第0行指令执行，实现循环逻辑
-注意：可使用标签跳转，举例：
-jump a always 0 0
-a:
+注意：可使用标签跳转，这是文本编写专用的功能，编辑器中只能使用行号跳转。标签格式为"标签名:"（以冒号结尾，独占一行），在jump指令中将目标行号替换为标签名即可。标签不可放置在代码的最后一行，否则跳转会被解析为-1（无目标），导致跳转失效。解决方法是在标签后添加end等占位指令，或将标签移至首行。
+示例（文本编写）：
+jump loopStart always 0 0
+loopStart:
 print "yes"
-警告：标签不可放置在代码的最后一行，否则跳转会被解析为-1（无目标），导致跳转失效。解决方法是将标签移至首行或使用end等占位。
+end
 
 23.Unit Bind（输出：unit）
 作用：将处理器绑定到全图范围内与处理器同队伍的指定类型的某个单位，也可以绑定一个具体的与处理器同队伍的单位，绑定后可通过@unit变量访问该单位。世界处理器使用此指令可跨队伍绑定具体单位。
@@ -741,91 +749,170 @@ print "yes"
 注意：有个很经典的认知错误，对于指定类型的单位绑定，处理器不是一下子把所有同类型的单位都绑定了，而是执行一次这个指令绑定一个，因为处理器的处理速度很快，在指令数较少的情况下你可能会以为处理器是一下子把全部单位都绑定了。对于处理器绑定一个类型的单位的顺序，不好深究，你只需要知道处理器会按照某种顺序在每次执行一次这个指令的时候绑定一个新的同类型单位，如此往复，直到所有同类型的单位都绑定过后，再重新绑定一次。单位数量减少时，系统会将列表中最后一个单位交换到被删除单位的位置（置换删除）。此外，直接绑定具体unit（非content）时，不会影响通过content绑定时的下一个单位顺序。
 
 24.Unit Control (!6) (!17)
-作用：控制已绑定的单位执行各种操作。注意：ubind之外的单位语句（ucontrol、uradar、ulocate）都属于“控制语句”，执行时会向单位发出控制命令，使该单位被标记为被当前逻辑控制，期间原AI停用。
-编辑器：[p1] [p2] [p3] [p4] [p5] [p6]
+作用：控制已绑定的单位执行各种操作。注意：ubind之外的单位语句（ucontrol、uradar、ulocate）都属于"控制语句"，执行时会向单位发出控制命令，使该单位被标记为被当前逻辑控制，期间原AI停用。
 文本：ucontrol [p1] [p2] [p3] [p4] [p5] [p6]
 用法：
-- [p1]：控制类型（可选值：idle、stop、move、approach、pathfind、autoPathfind、boost、target、targetp、itemDrop、itemTake、payDrop、payTake、payEnter、mine、flag、build、deconstruct、getBlock、within、unbind）
-- [p2-p6]：根据控制类型不同，参数数量和含义不同，具体如下：
-  1.idle：原地不动，但继续采矿、建造、射击等操作
-  - 无额外参数
-  2.stop：停止一切操作
-  - 无额外参数
-  3.move：移动到指定坐标（径直移动，不寻路）
-  - p2：目标x坐标
-  - p3：目标y坐标
-  4.approach：围绕指定坐标（径直移动，不寻路）
-  - p2：目标x坐标
-  - p3：目标y坐标
-  - p4：围绕范围
-  5.pathfind：寻路到指定坐标（注意：若单位无法到达指定坐标点，例如目标点被块挡住，但单位不具有飞行或爬行能力或，那么单位将会杵在原地。目标点距离单位过远可能导致寻路时间增长，表现为很长一段时间单位杵在原地不动然后开始移动）
-  - p2：目标x坐标
-  - p3：目标y坐标
-  6.autoPathfind：自动寻路到最近的敌方核心或敌人生成点（与波次敌人的寻路行为相同）
-  - 无额外参数
-  7.boost：开启/关闭助推
-  - p2：是否开启
-  8.target：攻击指定坐标
-  - p2：目标x坐标
-  - p3：目标y坐标
-  - p4：是否射击
-  9.targetp：攻击指定目标（带预判）
-  - p2：目标单位或建筑
-  - p3：是否射击（提示：目标在单位的雷达范围内才会射击，否则只会瞄准，而且这个瞄准还不管距离，哪怕和目标相距1000多格都能瞄准。或许可以用来做雷达？）
-  10.itemDrop：放下携带的物品
-  - p2：目标建筑（必须与单位同队伍，且建筑允许存入物品；可使用@air直接丢弃物品）
-  - p3：物品数量
-  注意：单位与目标建筑的距离不能超过5.625+目标建筑尺寸×0.5格（例如对尺寸为2的建筑，最大距离为6.625格）；建筑默认允许存入物品，但若游戏规则启用了"仅允许存入核心"，则只有核心和已链接核心的仓储建筑允许存入
-  11.itemTake：从指定建筑拾取物品
-  - p2：目标建筑（必须与单位同队伍，且建筑必须有物品栏）
-  - p3：物品类型
-  - p4：物品数量
-  注意：单位与目标建筑的距离不能超过5.625+目标建筑尺寸×0.5格（例如对尺寸为2的建筑，最大距离为6.625格）；逻辑指令不受建筑"是否输出物品"限制，即使炮塔等手动无法取出物品的建筑，逻辑指令也可以从中拿取物品
-  12.payDrop：放下携带的载荷
-  - 无额外参数
-  13.payTake：拾取附近的载荷
-  - p2：是否拾取单位（拾取单位时搜索范围为碰撞半径×2；拾取建筑载荷时，单位必须站在目标建筑上方）
-  14.payEnter：进入指定建筑（单位必须站在目标建筑上方才能进入）
-  - 无额外参数
-  15.mine：在指定坐标采矿
-  - p2：采矿点x坐标
-  - p3：采矿点y坐标
-  16.flag：设置单位标记
-  - p2：标记值（可为任意数字，包括负数和浮点数；若值不是数字，比如content类型变量，则其值不为null、0、false时其值均取1）
-  17.build：建造指定建筑
-  - p2：目标x坐标
-  - p3：目标y坐标
-  - p4：建筑类型（可填写@this使单位建造一个处理器的克隆体）
-  - p5：旋转角度(!1)
-  - p6：建筑的配置。可直接传入一个building类型变量来复制该建筑的config配置。
-  18.deconstruct：拆除指定位置的建筑（需要规则中启用单位拆除建筑，在自定义规则中默认关闭）
-  - p2：目标x坐标
-  - p3：目标y坐标
-  19.getBlock：获取指定位置的地块信息（目标位置需在单位的最大范围与建造范围中较大者的范围内，否则无法获取）
-  - p2：目标x坐标
-  - p3：目标y坐标
-  - p4：存储块的content类型变量，若无块则为@air
-  - p5：存储块的building类型变量
-  - p6：存储地板/覆盖层的content类型变量（有覆盖层时返回覆盖层，无覆盖层时返回地板）
-  20.within：判断是否在指定范围内
-  - p2：目标x坐标
-  - p3：目标y坐标
-  - p4：范围
-  - p5：存储结果的变量
-  注意：此为控制语句，若不需要控制标记，建议手动计算距离（op len）以避免干扰单位AI。
-  21.unbind：解除单位绑定，恢复单位原始AI。注意：命名为unbind但实际作用是解除控制。若不确定当前单位是否被自己控制，不要轻易使用，以免打断其他逻辑。
-  - 无额外参数
-示例1：ucontrol move 100 200
-解释：控制已绑定的单位移动到(100,200)坐标
-示例2：ucontrol target Unit 1
-解释：控制已绑定的单位射击Unit单位
+- [p1]：控制类型（可选值见下方各子指令）
+- [p2-p6]：根据控制类型不同，参数数量和含义不同
+
+①编辑器：idle
+文本：ucontrol idle 0 0 0 0 0
+用法：原地不动，但继续采矿、建造、射击等操作
+- 无额外参数
+示例：ucontrol idle 0 0 0 0 0 → 单位原地不动
+
+②编辑器：stop
+文本：ucontrol stop 0 0 0 0 0
+用法：停止一切操作
+- 无额外参数
+示例：ucontrol stop 0 0 0 0 0 → 单位停止一切操作
+
+③编辑器：move x[p2] y[p3]
+文本：ucontrol move [p2] [p3] 0 0 0
+用法：移动到指定坐标（径直移动，不寻路）
+- [p2]：目标x坐标
+- [p3]：目标y坐标
+示例：ucontrol move 100 200 0 0 0 → 控制单位移动到(100,200)坐标
+
+④编辑器：approach x[p2] y[p3] radius[p4]
+文本：ucontrol approach [p2] [p3] [p4] 0 0
+用法：围绕指定坐标移动（径直移动，不寻路）
+- [p2]：目标x坐标
+- [p3]：目标y坐标
+- [p4]：围绕范围
+示例：ucontrol approach 100 200 10 0 0 → 控制单位围绕(100,200)坐标在10格范围内移动
+
+⑤编辑器：pathfind x[p2] y[p3]
+文本：ucontrol pathfind [p2] [p3] 0 0 0
+用法：寻路到指定坐标（注意：若单位无法到达指定坐标点，例如目标点被块挡住，但单位不具有飞行或爬行能力，那么单位将会杵在原地。目标点距离单位过远可能导致寻路时间增长，表现为很长一段时间单位杵在原地不动然后开始移动）
+- [p2]：目标x坐标
+- [p3]：目标y坐标
+示例：ucontrol pathfind 150 150 0 0 0 → 控制单位寻路到(150,150)坐标
+
+⑥编辑器：autoPathfind
+文本：ucontrol autoPathfind 0 0 0 0 0
+用法：自动寻路到最近的敌方核心或敌人生成点（与波次敌人的寻路行为相同）
+- 无额外参数
+示例：ucontrol autoPathfind 0 0 0 0 0 → 控制单位自动寻路到敌方目标
+
+⑦编辑器：boost enable[p2]
+文本：ucontrol boost [p2] 0 0 0 0
+用法：开启/关闭助推
+- [p2]：是否开启（1=开启，0=关闭）
+示例：ucontrol boost 1 0 0 0 0 → 开启单位助推
+
+⑧编辑器：target x[p2] y[p3] shoot[p4]
+文本：ucontrol target [p2] [p3] [p4] 0 0
+用法：攻击指定坐标
+- [p2]：目标x坐标
+- [p3]：目标y坐标
+- [p4]：是否射击（1=射击，0=瞄准）
+示例：ucontrol target 100 200 1 0 0 → 控制单位向(100,200)坐标射击
+
+⑨编辑器：targetp unit[p2] shoot[p3]
+文本：ucontrol targetp [p2] [p3] 0 0 0
+用法：攻击指定目标（带预判）
+- [p2]：目标单位或建筑
+- [p3]：是否射击（提示：目标在单位的武器范围内才会射击，否则只会瞄准，而且这个瞄准还不管距离，哪怕和目标相距1000多格都能瞄准）
+示例：ucontrol targetp enemyUnit 1 0 0 0 → 控制单位带预判射击enemyUnit
+
+⑩编辑器：itemDrop to[p2] amount[p3]
+文本：ucontrol itemDrop [p2] [p3] 0 0 0
+用法：放下携带的物品
+- [p2]：目标建筑（必须与单位同队伍，且建筑允许存入物品；可使用@air直接丢弃物品）
+- [p3]：物品数量
+注意：单位与目标建筑的距离不能超过5.625+目标建筑尺寸×0.5格（例如对尺寸为2的建筑，最大距离为6.625格）；建筑默认允许存入物品，但若游戏规则启用了"仅允许存入核心"，则只有核心和已链接核心的仓储建筑允许存入
+示例：ucontrol itemDrop core1 10 0 0 0 → 控制单位向core1建筑放下10个物品
+
+⑪编辑器：itemTake from[p2] item[p3] amount[p4]
+文本：ucontrol itemTake [p2] [p3] [p4] 0 0
+用法：从指定建筑拾取物品
+- [p2]：目标建筑（必须与单位同队伍，且建筑必须有物品栏）
+- [p3]：物品类型（content类型变量，如@copper）
+- [p4]：物品数量
+注意：单位与目标建筑的距离不能超过5.625+目标建筑尺寸×0.5格（例如对尺寸为2的建筑，最大距离为6.625格）；逻辑指令不受建筑"是否输出物品"限制，即使炮塔等手动无法取出物品的建筑，逻辑指令也可以从中拿取物品
+示例：ucontrol itemTake core1 @copper 5 0 0 → 控制单位从core1建筑拾取5个铜
+
+⑫编辑器：payDrop
+文本：ucontrol payDrop 0 0 0 0 0
+用法：放下携带的载荷
+- 无额外参数
+示例：ucontrol payDrop 0 0 0 0 0 → 控制单位放下载荷
+
+⑬编辑器：payTake takeUnits[p2]
+文本：ucontrol payTake [p2] 0 0 0 0
+用法：拾取附近的载荷
+- [p2]：是否拾取单位（1=拾取单位，0=拾取建筑载荷；拾取单位时搜索范围为碰撞半径×2；拾取建筑载荷时，单位必须站在目标建筑上方）
+示例：ucontrol payTake 1 0 0 0 0 → 控制单位拾取附近的单位载荷
+
+⑭编辑器：payEnter
+文本：ucontrol payEnter 0 0 0 0 0
+用法：进入指定建筑（单位必须站在目标建筑上方才能进入）
+- 无额外参数
+示例：ucontrol payEnter 0 0 0 0 0 → 控制单位进入脚下的建筑
+
+⑮编辑器：mine x[p2] y[p3]
+文本：ucontrol mine [p2] [p3] 0 0 0
+用法：在指定坐标采矿
+- [p2]：采矿点x坐标
+- [p3]：采矿点y坐标
+示例：ucontrol mine 50 60 0 0 0 → 控制单位在(50,60)坐标采矿
+
+⑯编辑器：flag value[p2]
+文本：ucontrol flag [p2] 0 0 0 0
+用法：设置单位标记
+- [p2]：标记值（可为任意数字，包括负数和浮点数；若值不是数字，比如content类型变量，则其值不为null、0、false时其值均取1）
+示例：ucontrol flag 1 0 0 0 0 → 将单位标记设为1
+
+⑰编辑器：build x[p2] y[p3] block[p4] rotation[p5] config[p6]
+文本：ucontrol build [p2] [p3] [p4] [p5] [p6]
+用法：建造指定建筑
+- [p2]：目标x坐标
+- [p3]：目标y坐标
+- [p4]：建筑类型（content类型变量，必须为Block类型如@copperWall，不可传入Building类型变量如@this）
+- [p5]：旋转角度(!1)
+- [p6]：建筑的配置（可直接传入一个building类型变量来复制该建筑的config配置）
+示例：ucontrol build 100 200 @copperWall 0 0 → 控制单位在(100,200)建造铜墙
+
+⑱编辑器：deconstruct x[p2] y[p3]
+文本：ucontrol deconstruct [p2] [p3] 0 0 0
+用法：拆除指定位置的建筑（需要规则中启用单位拆除建筑，在自定义规则中默认关闭）
+- [p2]：目标x坐标
+- [p3]：目标y坐标
+示例：ucontrol deconstruct 100 200 0 0 0 → 控制单位拆除(100,200)位置的建筑
+
+⑲编辑器：getBlock x[p2] y[p3] type[p4] building[p5] floor[p6]
+文本：ucontrol getBlock [p2] [p3] [p4] [p5] [p6]
+用法：获取指定位置的地块信息（目标位置需在单位的最大范围与建造范围中较大者的范围内，否则无法获取）
+- [p2]：目标x坐标
+- [p3]：目标y坐标
+- [p4]：存储块的content类型变量，若无块则为@air
+- [p5]：存储块的building类型变量
+- [p6]：存储地板/覆盖层的content类型变量（有覆盖层时返回覆盖层，无覆盖层时返回地板）
+示例：ucontrol getBlock 50 50 blockType buildingObj floorType → 获取(50,50)位置的地块信息
+
+⑳编辑器：within x[p2] y[p3] radius[p4] result[p5]
+文本：ucontrol within [p2] [p3] [p4] [p5] 0
+用法：判断是否在指定范围内
+- [p2]：目标x坐标
+- [p3]：目标y坐标
+- [p4]：范围
+- [p5]：存储结果的变量（1=在范围内，0=不在范围内）
+注意：此为控制语句，若不需要控制标记，建议手动计算距离（op len）以避免干扰单位AI。
+示例：ucontrol within 100 100 50 result 0 → 判断单位是否在(100,100)的50格范围内
+
+㉑编辑器：unbind
+文本：ucontrol unbind 0 0 0 0 0
+用法：解除单位绑定，恢复单位原始AI。注意：命名为unbind但实际作用是解除控制。若不确定当前单位是否被自己控制，不要轻易使用，以免打断其他逻辑。
+- 无额外参数
+示例：ucontrol unbind 0 0 0 0 0 → 解除单位控制
 
 25.Unit Radar（输出：unit） (!6) (!17)
 作用：获取已绑定单位雷达范围内的单位，支持筛选与排序。注意：此为控制语句，会发出控制信号。
 编辑器：target [p1] and [p2] and [p3] order [p4] sort [p5] output [p6]
-文本：uradar [p1] [p2] [p3] [p5] [p4] [p6]
-用法：与Radar指令基本相同，不过多赘述。
-示例：uradar enemy flying any distance 1 targetUnit
+文本：uradar [p1] [p2] [p3] [p5] 0 [p4] [p6]
+用法：与Radar指令基本相同，不过多赘述。注意文本格式中第5个参数为占位参数填0（对应编辑器中的@unit固定值）。
+示例：uradar enemy flying any distance 0 1 targetUnit
 解释：以已绑定单位为基准，搜索敌方空军单位，按距离从近到远排序，结果存入targetUnit变量
 
 26.Unit Locate（输出：number、building） (!6) (!17)
@@ -837,14 +924,16 @@ print "yes"
 - 根据查找类型不同，[p2]-[p8]的参数含义也不同，具体如下：
 
 ①查找类型：ore（矿物）
-编辑器：find ore [p2] outX [p5] outY [p6] found [p7]
+编辑器：find ore [p4] outX [p5] outY [p6] found [p7]
 用法：
-- p2：矿物类型（content类型变量，如@copper）
+- p2：建筑分类（在ore模式中不使用，填任意有效的BlockFlag值如core即可）
+- p3：是否敌方（在ore模式中不使用，填任意值即可）
+- p4：矿物类型（content类型变量，如@copper）
 - p5（outX）：目标的x坐标（number类型变量）
 - p6（outY）：目标的y坐标（number类型变量）
 - p7（found）：是否找到了矿物（number类型变量，1=找到，0=未找到）
-剩余参数[p3]、[p4]、[p8]在ore模式中不使用，填任意值即可。
-示例：ulocate ore @copper 0 0 targetX targetY found 0
+[p8]在ore模式中不使用，填任意值即可。
+示例：ulocate ore core 0 @copper targetX targetY found 0
 解释：让已绑定的单位查找最近的铜矿，坐标存入targetX和targetY变量，结果存入found变量
 
 ②查找类型：building（建筑）
@@ -902,47 +991,50 @@ print "yes"
 28.Get Block（输出：block/floor/overlay/building）
 作用：获取指定位置的方块信息，支持不同图层（方块层、地形层、覆盖层、建筑层）。这是特权指令，需要世界处理器。
 编辑器：[p1] = get [p2] at [p3], [p4]
-文本：getblock [p1] [p3] [p4] [p2]
-用法：
-- [p1]：存储结果的变量名
-- [p2]：图层类型（可选值：floor、ore、block、building）。注意：ore层返回的是覆盖层（overlay），而非仅限矿物；若无覆盖层则返回地板
-- [p3]：目标x坐标（地图格子单位）
-- [p4]：目标y坐标（地图格子单位）
-示例1：getblock result block 10 20
+文本：getblock [p2] [p1] [p3] [p4]
+　　　注意：文本格式与编辑器顺序不同——编辑器中 result 在前、layer 在后，但文本格式中 layer 在前、result 在后。
+用法（按文本格式顺序）：
+- 第1个参数：图层类型（可选值：floor、ore、block、building）。注意：ore层返回的是覆盖层（overlay），而非仅限矿物；若无覆盖层则返回地板
+- 第2个参数：存储结果的变量名
+- 第3个参数：目标x坐标（地图格子单位）
+- 第4个参数：目标y坐标（地图格子单位）
+示例1：getblock block result 10 20
 解释：获取(10,20)位置的方块类型，结果存入result变量
-示例2：getblock result building 15 25
+示例2：getblock building result 15 25
 解释：获取(15,25)位置的建筑，结果存入result变量
 
 29.Set Block（输出：无）
 作用：修改指定位置的方块信息，支持不同图层（方块层、地形层、覆盖层）。这是特权指令，需要世界处理器。
 编辑器：set [p1] at [p2], [p3] to [p4] team [p5] rotation [p6]
-文本：setblock [p1] [p2] [p3] [p4] [p5] [p6]
-用法：
-- [p1]：图层类型（可选值：floor、ore、block）
+文本：setblock [p1] [p4] [p2] [p3] [p5] [p6]
+　　　注意：文本格式与编辑器顺序不同——编辑器中坐标在前、方块类型在后，但文本格式中方块类型紧跟图层类型。
+用法（按文本格式顺序）：
+- 第1个参数：图层类型（可选值：floor、ore、block）
   - floor层仅接受地板类方块（如@grass、@sand、@water等纯地板），不接受覆盖层类方块（如矿石、沙暴等覆盖在地表上的东西）；ore层仅接受覆盖层类方块或@air；block层仅接受建筑类方块或@air
-- [p2]：目标x坐标（地图格子单位）
-- [p3]：目标y坐标（地图格子单位）
-- [p4]：方块类型（content类型变量，如@copperWall、@grass）
-- [p5]：队伍（仅当p1为block时有效，如@sharded、@derelict）
-- [p6]：旋转角度（仅当p1为block时有效，0~3）
-示例1：setblock block 10 20 @copperWall @sharded 0
+- 第2个参数：方块类型（content类型变量，如@copperWall、@grass）
+- 第3个参数：目标x坐标（地图格子单位）
+- 第4个参数：目标y坐标（地图格子单位）
+- 第5个参数：队伍（仅当第1个参数为block时有效，如@sharded、@derelict）
+- 第6个参数：旋转角度（仅当第1个参数为block时有效，0~3）
+示例1：setblock block @copperWall 10 20 @sharded 0
 解释：在(10,20)位置放置铜墙，队伍为sharded，旋转角度为0
-示例2：setblock ore 15 25 @copper
+示例2：setblock ore @copper 15 25 @derelict 0
 解释：在(15,25)位置放置铜矿覆盖层
 
 30.Spawn Unit（输出：unit）
 作用：在指定位置生成指定类型的单位。这是特权指令，需要世界处理器。
 编辑器：[p1] = spawn [p2] at [p3], [p4] team [p5] rot [p6]
-文本：spawn [p1] [p2] [p3] [p4] [p5] [p6]
-用法：
-- [p1]：存储生成单位的变量名（unit类型）
-- [p2]：单位类型（content类型变量，如@dagger、@poly）
-- [p3]：生成位置x坐标（地图格子单位）
-- [p4]：生成位置y坐标（地图格子单位）
-- [p5]：队伍（如@sharded、@derelict）
-- [p6]：旋转角度（角度制）
-示例：spawn newUnit @dagger 10 20 @sharded 90
-解释：在(10,20)位置生成dagger类型的单位，队伍为sharded，旋转角度为90度，结果存入newUnit变量
+文本：spawn [p2] [p3] [p4] [p6] [p5] [p1]
+　　　注意：文本格式与编辑器顺序不同——编辑器中 result 在前，但文本格式中 result 在最后；编辑器中 team 在 rotation 前，但文本格式中 rotation 在 team 前。
+用法（按文本格式顺序）：
+- 第1个参数：单位类型（content类型变量，如@dagger、@poly）
+- 第2个参数：生成位置x坐标（地图格子单位）
+- 第3个参数：生成位置y坐标（地图格子单位）
+- 第4个参数：旋转角度（角度制）
+- 第5个参数：队伍（如@sharded、@derelict）
+- 第6个参数：存储生成单位的变量名（unit类型）
+示例：spawn @dagger 10 20 90 @sharded newUnit
+解释：在(10,20)位置生成dagger类型的单位，旋转角度为90度，队伍为sharded，结果存入newUnit变量
 
 31.Spawn Bullet（输出：bullet）
 作用：在指定位置生成子弹（如炮塔弹药），可自定义伤害、速度、生命值等。这是特权指令，需要世界处理器。
@@ -950,8 +1042,8 @@ print "yes"
 文本：spawnbullet [p1] [p2] [p3] [p4] [p5] [p6] [p7] [p8] [p9] [p10] [p11] [p12] [p13]
 用法：
 - [p1]：存储生成子弹的变量名（bullet类型）
-- [p2]：子弹来源（可为unit类型变量如@dagger、炮塔建筑变量、或物品类型）
-- [p3]：子弹索引（当from为单位类型时，为武器索引；当from为炮塔时，为弹药物品或液体类型）
+- [p2]：子弹来源（可为UnitType类型变量如@dagger、ItemTurret类型炮塔建筑变量如duo1、LiquidTurret类型炮塔建筑变量、ContinuousLiquidTurret类型炮塔建筑变量、PowerTurret类型炮塔建筑变量、ContinuousTurret类型炮塔建筑变量）
+- [p3]：子弹索引（当from为UnitType时，为武器索引，对应单位武器的序号从0开始；当from为ItemTurret时，为弹药物品类型如@copper；当from为LiquidTurret/ContinuousLiquidTurret时，为弹药液体类型如@water；当from为PowerTurret/ContinuousTurret时，此参数忽略）
 - [p4]：生成位置x坐标（地图格子单位）
 - [p5]：生成位置y坐标（地图格子单位）
 - [p6]：发射旋转角度（角度制）
@@ -967,17 +1059,45 @@ print "yes"
 
 32.Apply Status（输出：无）
 作用：为指定单位添加或清除状态效果。这是特权指令，需要世界处理器。
-编辑器：[p1] [p2] to [p3] for [p4] sec
-文本：status [p1] [p2] [p3] [p4]
-用法：
-- [p1]：操作类型（apply=添加状态，clear=清除状态）
-- [p2]：状态效果名称（如wet、burning、speed、slow）
+①编辑器：apply [p2] to [p3] for [p4] sec
+文本：status false [p2] [p3] [p4]
+用法：为指定单位添加状态效果
+- false：固定值，表示添加状态（不可替换为"apply"，必须使用布尔值false）
+- [p2]：状态效果名称（可选值见下方列表，使用时需加@前缀，如@burning、@wet）
 - [p3]：目标单位（unit类型变量）
-- [p4]：状态持续时间（秒，仅当p1为apply时有效）
-示例1：status apply speed myUnit 10
-解释：为myUnit单位添加10秒的加速状态
-示例2：status clear burning enemyUnit
-解释：清除enemyUnit单位的燃烧状态
+- [p4]：状态持续时间（秒；永久状态无此参数，编辑器中也不显示）
+示例：status false @speed myUnit 10 → 为myUnit单位添加10秒的加速状态
+
+②编辑器：clear [p2] from [p3]
+文本：status true [p2] [p3]
+用法：清除指定单位的状态效果
+- true：固定值，表示清除状态（不可替换为"clear"，必须使用布尔值true）
+- [p2]：要清除的状态效果名称（需加@前缀）
+- [p3]：目标单位（unit类型变量）
+示例：status true @burning enemyUnit → 清除enemyUnit单位的燃烧状态
+  none —— 无效果
+  burning —— 燃烧：持续受到伤害；与wet、freezing互斥；与tarred亲和增强
+  freezing —— 冰冻：降低移速和生命值倍率；与melting、burning互斥；与blasted亲和触发额外伤害
+  unmoving —— 定身：移速降为0
+  slow —— 减速：移速降低；与fast互斥
+  fast —— 加速：移速提升；与slow互斥
+  wet —— 潮湿：略微降低移速；与shocked亲和触发额外伤害；与burning、melting互斥
+  muddy —— 泥泞：略微降低移速
+  melting —— 熔化：降低移速和生命值倍率，持续受到伤害；与wet、freezing互斥；与tarred亲和增强
+  sapped —— 衰弱：降低移速和生命值倍率
+  tarred —— 柏油：降低移速；与melting、burning亲和增强
+  overdrive —— 超速：提升移速和伤害倍率，略微回复生命；永久状态
+  overclock —— 超频：提升移速、伤害倍率和装填速度
+  shielded —— 护盾：生命值倍率大幅提升
+  boss —— Boss：提升伤害和生命值倍率；永久状态
+  shocked —— 感电：反应性状态，与wet亲和触发额外伤害
+  blasted —— 爆炸：反应性状态，与freezing亲和触发额外伤害
+  corroded —— 腐蚀：按间隔受到伤害
+  disarmed —— 缴械：无法攻击
+  spore-slowed —— 孢子减速：降低移速
+  electrified —— 带电：降低移速和装填速度
+  invincible —— 无敌：生命值倍率无限
+  dynamic —— 动态：用于自定义状态效果的内部状态；永久状态
 
 33.Weather Sense（输出：number）
 作用：检测指定天气是否正在生效。这是特权指令，需要世界处理器。
@@ -985,7 +1105,7 @@ print "yes"
 文本：weathersense [p1] [p2]
 用法：
 - [p1]：存储结果的变量名（number类型，1=生效，0=未生效）
-- [p2]：天气类型（content类型变量，如@rain、@snow、@sandstorm）
+- [p2]：天气类型（content类型变量，可选值：@rain（雨）、@snowing（雪）、@sandstorm（沙暴）、@sporestorm（孢子风暴）、@fog（雾）、@suspend-particles（悬浮粒子，隐藏天气））
 示例：weathersense isRaining @rain
 解释：检测雨天气是否正在生效，结果存入isRaining变量
 
@@ -994,7 +1114,7 @@ print "yes"
 编辑器：set weather [p1] state [p2]
 文本：weatherset [p1] [p2]
 用法：
-- [p1]：天气类型（content类型变量，如@rain、@snow、@sandstorm）
+- [p1]：天气类型（content类型变量，可选值：@rain（雨）、@snowing（雪）、@sandstorm（沙暴）、@sporestorm（孢子风暴）、@fog（雾）、@suspend-particles（悬浮粒子，隐藏天气））
 - [p2]：天气状态（1=开启，0=关闭）
 示例1：weatherset @rain 1
 解释：开启雨天气
@@ -1004,23 +1124,23 @@ print "yes"
 35.Spawn Wave（输出：无）
 作用：生成一波敌人，支持自然生成和指定位置生成。这是特权指令，需要世界处理器。
 编辑器：natural [p1] x [p2] y [p3]
-文本：spawnwave [p1] [p2] [p3]
-用法：
-- [p1]：是否自然生成（1=是，使用地图预设的生成点；0=否，使用指定位置）
-- [p2]：生成位置x坐标（仅当p1为0时有效，地图格子单位）
-- [p3]：生成位置y坐标（仅当p1为0时有效，地图格子单位）
-示例1：spawnwave 1 0 0
+文本：spawnwave [p2] [p3] [p1]
+　　　注意：文本格式与编辑器顺序不同——编辑器中 natural 在前，但文本格式中 natural 在最后。
+用法（按文本格式顺序）：
+- 第1个参数：生成位置x坐标（仅当第3个参数为0时有效，地图格子单位）
+- 第2个参数：生成位置y坐标（仅当第3个参数为0时有效，地图格子单位）
+- 第3个参数：是否自然生成（1=是，使用地图预设的生成点；0=否，使用指定位置）
+示例1：spawnwave 0 0 1
 解释：自然生成一波敌人
-示例2：spawnwave 0 100 200
+示例2：spawnwave 100 200 0
 解释：在(100,200)位置生成一波敌人
 
 36.Set Rule（输出：无）
 作用：修改游戏规则，如波次间隔、单位上限、建筑速度等。这是特权指令，需要世界处理器。
-编辑器：根据规则类型不同而变化，通用格式为 [p1] = [p2]
 文本：setrule [p1] [p2] [p3] [p4] [p5] [p6]
 用法：
-- [p1]：规则类型，可选值如下：
-  通用规则（仅需p1和p2两个参数，p1=规则名，p2=规则值）：
+- [p1]：规则类型，可选值如下（编辑器格式随规则类型不同而变化）：
+  通用规则（编辑器格式：[规则名] = [值]；文本仅需p1和p2两个参数）：
     currentWaveTime：当前波次倒计时（秒）
     waveTimer：波次计时器是否启用（1=启用，0=禁用）
     waves：是否允许波次（1=允许，0=禁止）
@@ -1031,25 +1151,29 @@ print "yes"
     enemyCoreBuildRadius：敌方核心禁止建筑范围半径（地图格）
     dropZoneRadius：敌方空降区半径（地图格）
     unitCap：基本单位数量上限
-    mapArea：设置地图可用区域，如果设定的值超过地图本身最大大小，那么仍会使用地图的最大大小，不会进行扩展。地图有效区域外的所有块将会被停用，世界处理器除外，若有效区域外有玩家队伍的单位会被挤回有效区域内，非玩家队伍不受影响（p1=规则名，p2=x坐标，p3=y坐标，p4=宽度，p5=高度）
     lighting：是否启用环境光（1=启用，0=禁用）
     canGameOver：是否允许游戏结束（1=允许，0=禁止）
     ambientLight：环境光颜色（使用PackColor打包的颜色值）
     solarMultiplier：太阳能发电倍率
     dragMultiplier：阻力倍率
-    ban：禁用单位或建筑（p1=规则名，p2=目标content类型变量）
-    unban：解禁单位或建筑（p1=规则名，p2=目标content类型变量）
     pauseDisabled：是否禁止暂停（1=禁止，0=允许）
 
-  需要指定队伍的规则（需p1和p3两个参数，p3为队伍）：
-    buildSpeed：建造速度倍率（p2=倍率值，p3=队伍）
-    unitHealth：单位生命值倍率（p2=倍率值，p3=队伍）
-    unitBuildSpeed：单位制造速度倍率（p2=倍率值，p3=队伍）
-    unitMineSpeed：单位采矿速度倍率（p2=倍率值，p3=队伍）
-    unitCost：单位制造成本倍率（p2=倍率值，p3=队伍）
-    unitDamage：单位伤害倍率（p2=倍率值，p3=队伍）
-    blockHealth：建筑生命值倍率（p2=倍率值，p3=队伍）
-    blockDamage：建筑伤害倍率（p2=倍率值，p3=队伍）
+  地图区域规则（编辑器格式：[规则名] = [x] [y] [w] [h]；文本p2=x, p3=y, p4=宽度, p5=高度）：
+    mapArea：设置地图可用区域，如果设定的值超过地图本身最大大小，那么仍会使用地图的最大大小，不会进行扩展。地图有效区域外的所有块将会被停用，世界处理器除外，若有效区域外有玩家队伍的单位会被挤回有效区域内，非玩家队伍不受影响
+
+  禁用/解禁规则（编辑器格式：[规则名] block/unit [目标]；文本p2=目标content类型变量）：
+    ban：禁用单位或建筑
+    unban：解禁单位或建筑
+
+  队伍规则（编辑器格式：of [队伍] = [值]；文本p2=倍率值, p3=队伍）：
+    buildSpeed：建造速度倍率
+    unitHealth：单位生命值倍率
+    unitBuildSpeed：单位制造速度倍率
+    unitMineSpeed：单位采矿速度倍率
+    unitCost：单位制造成本倍率
+    unitDamage：单位伤害倍率
+    blockHealth：建筑生命值倍率
+    blockDamage：建筑伤害倍率
     rtsMinWeight：RTS部队发动攻击所需最小优势权重（RTS即即时战略模式，单位会自动组队进攻）
     rtsMinSquad：RTS攻击小队最小规模
 示例1：setrule waveSpacing 30
@@ -1061,11 +1185,11 @@ print "yes"
 
 37.Flush Message（输出：number）
 作用：将文本缓冲区内容显示为游戏内消息，并清空文本缓冲区。这是特权指令，需要世界处理器。
-编辑器：[p1] for [p2] sec success [p3]
+编辑器：[p1] [for [p2] sec] success [p3]
 文本：message [p1] [p2] [p3]
 用法：
 - [p1]：消息类型（可选值：notify（从上方弹出一个提示框呈现内容，提示框出现时间约3秒）、announce（在屏幕中央呈现内容）、toast（在屏幕上方呈现内容）、mission（在左上角状态栏呈现内容，内容实时更新，状态栏不会自动还原，需要打印一个空的内容来还原，注意不是空格））
-- [p2]：消息显示时间（秒，仅当p1为announce或toast时有效）
+- [p2]：消息显示时间（秒，仅当p1为announce或toast时有效，编辑器中也仅这两种类型显示此参数）
 - [p3]：存储操作结果的变量名，成功呈现内容即为成功。（number类型，1=成功，0=失败）。可填入@wait，当显示失败时（如上次同类型消息未结束）会阻塞等待直到成功。
 示例：message announce 5 result
 解释：将文本缓冲区内容显示为公告消息，持续5秒，操作结果存入result变量
@@ -1080,23 +1204,29 @@ stop
 
 38.Cutscene（输出：无）
 作用：控制游戏摄像机，实现过场动画效果。这是特权指令，需要世界处理器。
-编辑器：[p1] x [p2] y [p3] speed [p4]
-文本：cutscene [p1] [p2] [p3] [p4]
-用法：
-- [p1]：操作类型（可选值：pan（移动）、zoom（缩放）、stop（停止对玩家的摄像机控制））
-- [p2]：目标x坐标（仅当p1为pan时有效）
-- [p3]：目标y坐标（仅当p1为pan时有效）
-- [p4]：speed（仅当p1为pan时有效）或缩放级别（仅当p1为zoom时有效，1为最小，0.1为最大）
-  speed是一个0~1的平滑系数，表示每帧移动剩余距离的比例，而非固定速度（不是每秒移动多少格）。
-  值越大移动越快：1表示瞬间到达，0.5表示每帧移动一半剩余距离，0.01表示极慢过渡。编辑器中默认值为0.06。
-示例1：cutscene pan 100 200 0.5
-解释：让摄像机以0.5的平滑系数移动到(100,200)位置
-示例2：cutscene zoom 0.1
-解释：将摄像机缩放级别设置为0.1（扩大视野）
+①编辑器：pan x [p2] y [p3] speed [p4]
+文本：cutscene pan [p2] [p3] [p4]
+用法：移动摄像机到指定坐标
+- [p2]：目标x坐标
+- [p3]：目标y坐标
+- [p4]：平滑系数（0~1，值越大移动越快：1=瞬间到达，0.5=每帧移动一半剩余距离，0.01=极慢过渡；编辑器中默认值为0.06）
+示例：cutscene pan 100 200 0.5 → 以0.5的平滑系数将摄像机移动到(100,200)位置
+
+②编辑器：zoom level [p2]
+文本：cutscene zoom [p2]
+用法：缩放摄像机视野
+- [p2]：缩放级别（1为最小视野，0.1为最大视野）
+示例：cutscene zoom 0.1 → 将摄像机缩放级别设置为0.1（扩大视野）
+
+③编辑器：stop
+文本：cutscene stop
+用法：停止对玩家的摄像机控制
+- 无额外参数
+示例：cutscene stop → 停止摄像机控制
 
 39.Effect（输出：无）
 作用：在指定位置生成特效。这是特权指令，需要世界处理器。
-编辑器：[p1] x [p2] y [p3] [附加参数]
+编辑器：[p1] x [p2] y [p3] [color(如有)] [size/rotation(如有)] [data(如有)]
 文本：effect [p1] [p2] [p3] [p4] [p5] [p6]
 用法：
 - [p1]：特效类型，UI下拉菜单中可选的全部33种特效如下（按UI顺序排列）：
@@ -1135,11 +1265,11 @@ stop
   bubble —— 气泡特效
 - [p2]：特效位置x坐标
 - [p3]：特效位置y坐标
-- [p4]：特效大小或旋转角度（支持size的特效此参数为大小，支持旋转的特效此参数为旋转角度；若同时支持size和旋转，编辑器显示为"size"，实际传给旋转参数）
+- [p4]：特效大小或旋转角度。仅支持size的特效此参数为大小；仅支持旋转的特效此参数为旋转角度。注意：编辑器中color在size/rotation之前显示，但文本格式中p4（size/rotation）在p5（color）之前（!27）
 - [p5]：特效颜色（16进制颜色代码，如%ff0000；仅支持color的特效有效）
 - [p6]：额外数据（仅blockFall时可填写建筑类型content变量，如@conveyor；其他特效忽略）
-示例：effect warn 100 200 2 %ff0000 ""
-解释：在(100,200)位置生成大小为2的红色警告特效
+示例：effect lightBlock 100 200 3 %ff0000 ""
+解释：在(100,200)位置生成大小为3的红色光块特效
 
 40.Explosion（输出：无）
 作用：在指定位置生成爆炸，对范围内的单位和建筑造成伤害。这是特权指令，需要世界处理器。
@@ -1222,18 +1352,37 @@ stop
 编辑器：set [p1] of [p2] to [p3]
 文本：setprop [p1] [p2] [p3]
 用法：
-- [p1]：属性类型（可选值：@x、@y、@velocityX、@velocityY、@rotation、@speed、@armor、@health、@shield、@team、@flag、@totalPower、@payloadType、@bulletTime、@bulletLifetime）
-- [p2]：目标对象（building或unit类型变量）
-- [p3]：新的属性值（对于@x、@y直接设置坐标，无法修改处理器自身的坐标；对于@velocityX、@velocityY设置速度分量；对于@rotation设置旋转角度；对于@speed设置速度；对于@armor设置护甲；对于@health设置生命值；对于@shield设置护盾值；对于@team设置为队伍类型；对于@flag设置标记；对于@totalPower设置总电量；对于@payloadType设置载荷类型；对于@bulletTime设置子弹时间；对于@bulletLifetime设置子弹生命值）
+- [p1]：属性类型（可选值见下方分类）
+- [p2]：目标对象（building、unit或bullet类型变量）
+- [p3]：新的属性值
+属性按对象类型分类如下：
+  建筑支持：@health、@team、@totalPower
+  单位支持：@x、@y、@velocityX、@velocityY、@rotation、@speed、@armor、@health、@shield、@team、@flag、@payloadType
+  子弹支持：@x、@y、@velocityX、@velocityY、@rotation、@speed、@health、@team、@bulletLifetime、@bulletTime
+属性说明：
+- @x/@y：直接设置坐标（无法修改处理器自身的坐标）
+- @velocityX/@velocityY：设置速度分量（单位：格/秒）
+- @rotation：设置旋转角度
+- @speed：设置移动速度（单位：格/秒）
+- @armor：设置护甲值
+- @health：设置生命值（单位/建筑设为0会死亡/被毁；子弹设置的是伤害值而非生命值）
+- @shield：设置护盾值
+- @team：设置队伍（支持team类型变量如@sharded，或队伍ID数字）
+- @flag：设置单位标记
+- @totalPower：设置电池总电量
+- @payloadType：设置载荷类型（支持Block或UnitType类型变量添加载荷，传null移除最后一个载荷）
+- @bulletLifetime：设置子弹生命值
+- @bulletTime：设置子弹已存在时间
 示例：setprop @health myTurret 1000
 解释：将myTurret炮塔的生命值设置为1000
 
 47.Play Sound（输出：无）
 作用：播放指定音效。这是特权指令，需要世界处理器。
-编辑器：[p1] [p2] volume [p3] pitch [p4] pan [p5] x [p6] y [p7] limit [p8]
+编辑器：[p1] [p2] volume [p3] pitch [p4] pan [p5] / x [p6] y [p7]] limit [p8]
+（编辑器中，当p1为true时显示x[p6] y[p7]，当p1为false时显示pan [p5]）
 文本：playsound [p1] [p2] [p3] [p4] [p5] [p6] [p7] [p8]
 用法：
-- [p1]：音效类型（positional= 在指定坐标播放音效，会根据玩家的视角xy坐标进行音量衰减；global=全局音效）
+- [p1]：是否为位置音效（true=在指定坐标播放音效，会根据玩家的视角xy坐标进行音量衰减；false=全局音效；不可使用"positional"/"global"，必须使用布尔值true/false）
 - [p2]：音效ID，以下为全部可选的205种音效（使用时格式为 @sfx-音效名，如@sfx-shootDuo，按UI下拉菜单字母序排列）：
   建筑/方块音效（38种）：
     acceleratorCharge, acceleratorConstruct, acceleratorLaunch, acceleratorLightning1, acceleratorLightning2,
@@ -1288,13 +1437,13 @@ stop
     waveSpawn, wreckFall, wreckFallBig
 - [p3]：音量（0~2）
 - [p4]：音调（0.5~2）
-- [p5]：声道平衡（-1~1，仅当p1为global时有效）
-- [p6]：音效位置x坐标（仅当p1为positional时有效）
-- [p7]：音效位置y坐标（仅当p1为positional时有效）
+- [p5]：声道平衡（-1~1，仅当p1为false时有效）
+- [p6]：音效位置x坐标（仅当p1为true时有效）
+- [p7]：音效位置y坐标（仅当p1为true时有效）
 - [p8]：是否限制音效在同一帧内重复播放（1=是，0=否）
-示例1：playsound positional @sfx-shootDuo 1 1 0 100 200 1
+示例1：playsound true @sfx-shootDuo 1 1 0 100 200 1
 解释：在(100,200)位置播放shootDuo音效，音量1，音调1，限制播放频率
-示例2：playsound global @sfx-explosion 1 1 0 0 0 1
+示例2：playsound false @sfx-explosion 1 1 0 0 0 1
 解释：全局播放explosion音效，音量1，音调1，声道平衡0，限制播放频率
 
 48.Set Marker（输出：无）
@@ -1372,7 +1521,7 @@ stop
          添加 "allowLogicData": true，再点"加载(Load)"导入
        ● Mod：通过 Mod 代码设置该规则为 true
        若未启用此规则，ClientData 指令在编译阶段会返回 null，不执行任何操作。
-编辑器：send [p1] on [p2], reliable [p3]
+编辑器：send [p2] on [p1], reliable [p3]
 文本：clientdata [p1] [p2] [p3]
 　　　注意：文本格式与编辑器顺序不同——编辑器中 data 在前、channel 在后，但文本格式中 channel 在前、data 在后。
 用法：
